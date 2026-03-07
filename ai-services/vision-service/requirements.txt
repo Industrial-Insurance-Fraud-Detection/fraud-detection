@@ -1,0 +1,20 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# vision
+ultralytics==8.4.21
+opencv-python-headless==4.10.0.84
+Pillow==10.4.0
+numpy==1.26.4
+
+# http (for downloading from MinIO signed URLs)
+httpx==0.27.2
+
+# test
+pytest==8.3.3
+pytest-asyncio==0.24.0
+
+# async queue consumer
+aio-pika==9.4.3
