@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from models.classification.preprocessor import MaintenancePreprocessor
+from app.models.preprocessor import MaintenancePreprocessor
 
 def test_preprocessing_logic():
     preprocessor = MaintenancePreprocessor()

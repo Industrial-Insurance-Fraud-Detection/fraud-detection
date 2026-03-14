@@ -3,17 +3,12 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /service
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user --default-timeout=1000 --retries 10 -r requirements.txt
 
 
-# ── Stage 2: Runtime ─────────────────────────────────────────
+# ── Stage 2: Runtime ──────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
 WORKDIR /service
@@ -21,15 +16,12 @@ WORKDIR /service
 # Copy installed packages from builder
 COPY --from=builder /root/.local /root/.local
 
-# Copy application code
-COPY . .
-
-# Ensure model artifacts directory exists
-RUN mkdir -p models/classification/artifacts
+# Copy application code from app directory
+COPY app ./app
 
 # Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONPATH=/service
+ENV PYTHONPATH=/service/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -39,4 +31,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 8002
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1"]
+# Run uvicorn - main.py is inside /service/app
+WORKDIR /service/app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1"]

@@ -1,0 +1,67 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+*.so
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+!.env.example
+
+# ── Model weights (too large for git) ─────────────────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.weights
+*.bin
+ai-services/vision-service/app/models/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Testing & coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.log
+
+# ── Node / NestJS ─────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.npm
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.docker/
+
+# ── Kaggle / ML outputs ───────────────────────────────────────────────────────
+runs/
+*.mp4
+*.csv
+surface_defect_detection/
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.tmp
+*.bak

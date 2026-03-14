@@ -17,8 +17,8 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models.classification.preprocessor import MaintenancePreprocessor
-from models.classification.model import MaintenanceClassifier
+from app.models.preprocessor import MaintenancePreprocessor
+from app.models.model import MaintenanceClassifier
 
 
 # ── Fixtures ────────────────────────────────────────────────
@@ -49,12 +49,12 @@ def sample_raw_df():
 def trained_classifier():
     """Load trained classifier if available."""
     clf = MaintenanceClassifier(
-        model_path='models/classification/artifacts/classifier.pkl'
+        model_path='app/models/classifier.pkl'
     )
     if os.path.exists(clf.model_path):
         clf.load()
         return clf
-    pytest.skip("Model not trained yet. Run train_maintenance.py first.")
+    pytest.skip("Model not trained yet.")
 
 
 # ── Preprocessor Tests ───────────────────────────────────────

@@ -1,0 +1,4 @@
+# ── Classification Service ────────────────────────────────────
+classification-service/app/models/*.pkl
+classification-service/app/models/*.png
+

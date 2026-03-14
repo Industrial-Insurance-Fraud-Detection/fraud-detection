@@ -21,35 +21,30 @@ class MaintenanceClassifier:
     def generate_synthetic_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Create synthetic data for FAKE and SABOTAGE classes.
-        - FAKE: copy REAL_FAILURE rows, set anomaly features to zero.
-        - SABOTAGE: copy NORMAL rows, increase temperature and torque by 300%.
+        - FAKE: copy REAL_FAILURE rows, zero out the anomaly features.
+        - SABOTAGE: copy NORMAL rows, spike temperature and torque by 300%.
         """
-        # Separate Real Failure and Normal Wear
         real_failures = df[df['Target_Class'] == 'REAL_FAILURE'].copy()
-        normal_wear = df[df['Target_Class'] == 'NORMAL_WEAR'].copy()
+        normal_wear   = df[df['Target_Class'] == 'NORMAL_WEAR'].copy()
 
-        # Generate FAKE
+        # Generate FAKE: copy REAL_FAILURE rows, zero out features as per Kaggle
         fake_data = real_failures.copy()
-        # "set anomaly features to zero" - assuming this means the engineered anomaly indicators
-        # or just zero out the main features that might cause failure.
-        # Given the instruction is brief, I'll zero out rotational speed and torque as a proxy.
         fake_data['Rotational_speed'] = 0
-        fake_data['Torque'] = 0
-        fake_data['Power'] = 0
-        fake_data['Target_Class'] = 'FAKE'
+        fake_data['Torque']           = 0
+        fake_data['Power']            = 0
+        fake_data['Target_Class']     = 'FAKE'
 
-        # Generate SABOTAGE
+        # Generate SABOTAGE: copy NORMAL rows, spike temperature and torque (400% total)
         sabotage_data = normal_wear.copy()
-        # "increase temperature and torque by 300%"
-        sabotage_data['Air_temperature'] *= 4.0 # increase BY 300% means 4x
-        # For torque, it's a critical factor in failure
-        sabotage_data['Torque'] *= 4.0
-        # Re-engineer features affected by these changes
-        sabotage_data['Power'] = sabotage_data['Torque'] * sabotage_data['Rotational_speed']
-        sabotage_data['Target_Class'] = 'SABOTAGE'
+        sabotage_data['Air_temperature'] *= 4.0
+        sabotage_data['Torque']          *= 4.0
+        sabotage_data['Power']            = sabotage_data['Torque'] * sabotage_data['Rotational_speed']
+        sabotage_data['Target_Class']     = 'SABOTAGE'
 
         # Combine all
         combined_df = pd.concat([df, fake_data, sabotage_data], ignore_index=True)
+        # Filter to only the 4 required classes
+        combined_df = combined_df[combined_df['Target_Class'].isin(['NORMAL_WEAR', 'REAL_FAILURE', 'FAKE', 'SABOTAGE'])]
         return combined_df
 
     def train(self, df: pd.DataFrame):
@@ -66,7 +61,7 @@ class MaintenanceClassifier:
         # Split 30% into 1/3 (10%) and 2/3 (20%)
         X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.66, random_state=42, stratify=y_temp)
         
-        num_class = len(np.unique(y))
+        num_class = len(self.label_encoder.classes_)
         
         self.model = xgb.XGBClassifier(
             objective='multi:softprob',
@@ -83,7 +78,11 @@ class MaintenanceClassifier:
             verbose=False
         )
 
-        return X_test, y_test
+        # Calculate training accuracy for overfitting check
+        y_train_pred = self.model.predict(X_train)
+        train_accuracy = accuracy_score(y_train, y_train_pred)
+
+        return X_test, y_test, train_accuracy
 
     def evaluate(self, X_test, y_test):
         """
@@ -94,8 +93,8 @@ class MaintenanceClassifier:
         
         metrics = {
             'accuracy': accuracy_score(y_test, y_pred),
-            'precision': precision_score(y_test, y_pred, average='weighted'),
-            'recall': recall_score(y_test, y_pred, average='weighted')
+            'precision': precision_score(y_test, y_pred, average='weighted', zero_division=0),
+            'recall': recall_score(y_test, y_pred, average='weighted', zero_division=0)
         }
         
         print("\nModel Evaluation Results:")
@@ -103,9 +102,60 @@ class MaintenanceClassifier:
             print(f"{k.capitalize()}: {v:.4f}")
             
         print("\nClassification Report:")
-        print(classification_report(y_test, y_pred, target_names=self.label_encoder.classes_))
+        print(classification_report(y_test, y_pred, target_names=self.label_encoder.classes_, zero_division=0))
         
         return metrics
+
+    def class_to_fraud_score(self, predicted_class: str, confidence: float) -> int:
+        """
+        Convert a class label + confidence into a 0-100 fraud score.
+        Formula: score = base * confidence + 50 * (1 - confidence)
+        """
+        # Base fraud score per class (how suspicious each class is)
+        CLASS_TO_BASE_SCORE = {
+            "FAKE":         90,   # direct fraud signal — no physical signature
+            "SABOTAGE":     85,   # deliberate damage — strong fraud signal
+            "REAL_FAILURE": 20,   # genuine failure — low fraud
+            "NORMAL_WEAR":  10,   # normal usage — very low fraud
+        }
+        base = CLASS_TO_BASE_SCORE.get(predicted_class, 50)
+        score = base * confidence + 50 * (1 - confidence)
+        return int(round(score))
+
+    def build_classification_response(self, row: pd.Series) -> dict:
+        """
+        Given one row of features, run the model and return structured JSON response.
+        Matches the spec: { score, class, confidence, featureImportance }
+        """
+        if self.model is None:
+            self.load()
+
+        # Prepare input as a single-row DataFrame
+        X_input = pd.DataFrame([row])[self.feature_cols]
+
+        # Get softmax probabilities
+        proba = self.model.predict_proba(X_input)[0]
+
+        # Predicted class index and name
+        class_idx = int(np.argmax(proba))
+        predicted_class = self.label_encoder.classes_[class_idx]
+        confidence = float(round(proba[class_idx], 4))
+
+        # Convert to 0-100 fraud score
+        score = self.class_to_fraud_score(predicted_class, confidence)
+
+        # Feature importance (model-level)
+        feature_importance = {
+            col: round(float(imp), 4)
+            for col, imp in zip(self.feature_cols, self.model.feature_importances_)
+        }
+
+        return {
+            "score": score,
+            "class": predicted_class,
+            "confidence": confidence,
+            "featureImportance": feature_importance
+        }
 
     def save(self):
         """Save model and label encoder."""

@@ -1,37 +1,32 @@
 import os
-import io
 import base64
 import tempfile
 import uvicorn
 import pandas as pd
 from fastapi import FastAPI, HTTPException, File, UploadFile
-from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
-from pydantic import BaseModel
-from models.classification.preprocessor import MaintenancePreprocessor
-from models.classification.model import MaintenanceClassifier
+from fastapi.responses import RedirectResponse, FileResponse
+
+# Internal imports
+from config import (
+    SERVICE_NAME, SERVICE_VERSION, SERVICE_PORT,
+    MODEL_PATH, FEATURE_IMPORTANCE_PATH
+)
+from schemas import (
+    MaintenanceInput, ClassificationResponse, 
+    ClassifyFailureResponse, TrainResponse, HealthResponse
+)
+from models.preprocessor import MaintenancePreprocessor
+from models.model import MaintenanceClassifier
 
 app = FastAPI(
-    title="classification-service",
+    title=SERVICE_NAME,
     description="XGBoost 4-class failure classification — Fraud Detection Pipeline",
-    version="1.0.0",
+    version=SERVICE_VERSION,
 )
 
 # ── Initialize ──────────────────────────────────────────────
 preprocessor = MaintenancePreprocessor()
-classifier   = MaintenanceClassifier(
-    model_path="models/classification/artifacts/classifier.pkl"
-)
-
-FEATURE_IMPORTANCE_PATH = "models/classification/artifacts/feature_importance.png"
-
-# ── Schemas ─────────────────────────────────────────────────
-class MaintenanceInput(BaseModel):
-    Type: str          # L, M, H
-    Air_temperature: float
-    Process_temperature: float
-    Rotational_speed: float
-    Torque: float
-    Tool_wear: float
+classifier   = MaintenanceClassifier(model_path=MODEL_PATH)
 
 
 # ── Routes ──────────────────────────────────────────────────
@@ -41,19 +36,18 @@ async def root():
     return RedirectResponse(url="/docs")
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health_check():
-    import os
     model_ready = os.path.exists(classifier.model_path)
     return {
         "status":       "healthy",
-        "service":      "classification-service",
+        "service":      SERVICE_NAME,
         "model_loaded": model_ready,
     }
 
 
 # ── Original endpoint (kept for compatibility) ───────────────
-@app.post("/predict/maintenance")
+@app.post("/predict/maintenance", response_model=ClassificationResponse)
 def predict_maintenance(data: MaintenanceInput):
     """Single-row prediction from JSON — original endpoint."""
     try:
@@ -67,17 +61,14 @@ def predict_maintenance(data: MaintenanceInput):
         }])
 
         processed_df = preprocessor.preprocess(input_df, is_training=False)
-        prediction   = classifier.predict(processed_df)
-
-        # Fraud score mapping
-        fraud_map = {"FAKE": 90, "SABOTAGE": 95, "REAL_FAILURE": 30, "NORMAL_WEAR": 5}
-        fraud_score = fraud_map.get(prediction[0], 50)
+        prediction_result = classifier.build_classification_response(processed_df.iloc[0])
 
         return {
-            "prediction":    prediction[0],
-            "fraud_score":   fraud_score,
+            "prediction":    prediction_result["class"],
+            "fraud_score":   prediction_result["score"],
+            "confidence":    prediction_result["confidence"],
             "input_received": data.dict(),
-            "service":       "classification-service",
+            "service":       SERVICE_NAME,
         }
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="Model not trained yet. POST /train first.")
@@ -86,7 +77,7 @@ def predict_maintenance(data: MaintenanceInput):
 
 
 # ── New endpoint: classify from CSV file ─────────────────────
-@app.post("/classify-failure")
+@app.post("/classify-failure", response_model=ClassifyFailureResponse)
 async def classify_failure(file: UploadFile = File(...)):
     """
     Predict failure class from a full sensor CSV file.
@@ -98,7 +89,6 @@ async def classify_failure(file: UploadFile = File(...)):
     if not os.path.exists(classifier.model_path):
         raise HTTPException(status_code=503, detail="Model not trained yet. POST /train first.")
 
-    # Save upload to temp file
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
@@ -106,28 +96,20 @@ async def classify_failure(file: UploadFile = File(...)):
     try:
         df = pd.read_csv(tmp_path)
         processed_df = preprocessor.preprocess(df, is_training=False)
-        predictions  = classifier.predict(processed_df)
-
-        # Majority vote
+        
+        results = [classifier.build_classification_response(row) for _, row in processed_df.iterrows()]
+        
         from collections import Counter
-        majority = Counter(predictions).most_common(1)[0][0]
+        classes = [r["class"] for r in results]
+        majority = Counter(classes).most_common(1)[0][0]
 
-        # Fraud score
-        fraud_map   = {"FAKE": 90, "SABOTAGE": 95, "REAL_FAILURE": 30, "NORMAL_WEAR": 5}
-        fraud_score = fraud_map.get(majority, 50)
+        majority_confidences = [r["confidence"] for r in results if r["class"] == majority]
+        avg_confidence = sum(majority_confidences) / len(majority_confidences)
+        fraud_score = classifier.class_to_fraud_score(majority, avg_confidence)
 
-        # Class distribution
-        distribution = dict(Counter(predictions))
+        distribution = dict(Counter(classes))
+        fi = results[0]["featureImportance"]
 
-        # Feature importance
-        fi = {}
-        if classifier.model is not None:
-            fi = dict(zip(
-                classifier.feature_cols,
-                [round(float(v), 4) for v in classifier.model.feature_importances_]
-            ))
-
-        # Feature importance chart as base64
         chart_b64 = None
         if os.path.exists(FEATURE_IMPORTANCE_PATH):
             with open(FEATURE_IMPORTANCE_PATH, "rb") as f:
@@ -136,12 +118,12 @@ async def classify_failure(file: UploadFile = File(...)):
         return {
             "predicted_class":              majority,
             "fraud_score":                  fraud_score,
-            "row_count":                    len(predictions),
+            "row_count":                    len(results),
             "class_distribution":           distribution,
             "feature_importance":           fi,
             "feature_importance_chart_b64": chart_b64,
             "model":                        "XGBoost",
-            "service":                      "classification-service",
+            "service":                      SERVICE_NAME,
         }
 
     except Exception as e:
@@ -151,14 +133,14 @@ async def classify_failure(file: UploadFile = File(...)):
 
 
 # ── New endpoint: classify from JSON features ────────────────
-@app.post("/classify-features")
+@app.post("/classify-features", response_model=ClassificationResponse)
 def classify_features(data: MaintenanceInput):
     """Single-row prediction — same as /predict/maintenance but with richer response."""
     return predict_maintenance(data)
 
 
 # ── New endpoint: train from uploaded CSV ────────────────────
-@app.post("/train")
+@app.post("/train", response_model=TrainResponse)
 async def train_model(file: UploadFile = File(...)):
     """
     Retrain XGBoost from an uploaded CSV (Kaggle Predictive Maintenance dataset).
@@ -173,28 +155,19 @@ async def train_model(file: UploadFile = File(...)):
 
     try:
         df = pd.read_csv(tmp_path)
-
-        # Preprocess
         processed_df = preprocessor.preprocess(df, is_training=True)
-
-        # Generate synthetic FAKE + SABOTAGE data
         augmented_df = classifier.generate_synthetic_data(processed_df)
 
-        # Train
-        X_test, y_test = classifier.train(augmented_df)
-
-        # Evaluate
+        X_test, y_test, _ = classifier.train(augmented_df)
         metrics = classifier.evaluate(X_test, y_test)
 
-        # Check acceptance criteria
+        # Requirements: Accuracy > 80%, Precision > 75%, Recall > 80%
+        # These constants are in config but using them directly here for check
         assert metrics["accuracy"]  >= 0.80, f"Accuracy {metrics['accuracy']:.2%} < 80%"
         assert metrics["precision"] >= 0.75, f"Precision {metrics['precision']:.2%} < 75%"
         assert metrics["recall"]    >= 0.80, f"Recall {metrics['recall']:.2%} < 80%"
 
-        # Save model
         classifier.save()
-
-        # Save feature importance chart
         _save_feature_importance_chart(classifier)
 
         return {
@@ -259,4 +232,5 @@ def _save_feature_importance_chart(clf: MaintenanceClassifier):
 
 # ── Entry point ──────────────────────────────────────────────
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8002)
+    host = os.getenv("SERVICE_HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=SERVICE_PORT)

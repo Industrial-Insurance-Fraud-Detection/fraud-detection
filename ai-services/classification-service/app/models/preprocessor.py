@@ -59,11 +59,16 @@ class MaintenancePreprocessor:
             'TWF', 'Tool Wear Failure',
             'HDF', 'Heat Dissipation Failure',
             'OSF', 'Overstrain Failure',
-            'PWF', 'Power Failure'
+            'PWF', 'Power Failure',
+            'Random Failures' # Added based on Kaggle logic if applicable, though it's in normal_types above
         ]
         
-        if failure_type in normal_types:
+        if failure_type in ['No Failure', 'RNF', 'Random Failures']:
             return 'NORMAL_WEAR'
-        elif failure_type in failure_types:
+        elif failure_type in ['TWF', 'HDF', 'OSF', 'PWF',
+                           'Tool Wear Failure',
+                           'Heat Dissipation Failure',
+                           'Overstrain Failure',
+                           'Power Failure']:
             return 'REAL_FAILURE'
         return failure_type # Keeps FAKE/SABOTAGE if already present
