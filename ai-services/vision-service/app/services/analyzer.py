@@ -3,7 +3,7 @@ VisionAnalyzer — the brain of vision-service.
 
 Three components run on every submitted photo:
   1. YOLOv8  — damage detection + declared-type mismatch score
-  2. ELA     — image manipulation detection (signature-based)
+  2. ELA     — image manipulation detection (real Error Level Analysis)
   3. EXIF    — metadata consistency checks
 
 Each component returns a 0-100 score.
@@ -56,9 +56,23 @@ def _load_image_bytes(path: str) -> bytes:
     """
     Accept either a URL (http/https) or a local file path.
     Returns raw bytes so we can pass to both OpenCV and PIL.
+
+    Security: only http/https URLs are allowed — file:// and other
+    schemes are rejected to prevent SSRF attacks.
     """
+    if path.startswith("file://") or (
+        "://" in path and not path.startswith(("http://", "https://"))
+    ):
+        raise ValueError(
+            f"Unsafe URL scheme rejected: {path!r}. "
+            "Only http:// and https:// are allowed."
+        )
     if path.startswith("http://") or path.startswith("https://"):
-        with urllib.request.urlopen(path, timeout=30) as resp:
+        req = urllib.request.Request(
+            path,
+            headers={"User-Agent": "taamine-vision-service/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.read()
     return Path(path).read_bytes()
 
@@ -139,28 +153,52 @@ def _run_detection(
 
 def _ela_score_single(img_bytes: bytes) -> float:
     """
-    Detect the steganographic signature written by the Kaggle training notebook.
+    Real Error Level Analysis (ELA).
 
-    Rows 0,2,4,…,14 set to pixel value 42 = manipulated image.
-    Deviation from 42 in those rows:
-      ~1-3  → score ~96-99  (manipulated)
-      ~80-90 → score ~0      (clean)
+    How it works:
+      1. Re-compress the original JPEG at a known quality (75)
+      2. Compute absolute pixel difference: original vs re-compressed
+      3. Amplify and normalise — manipulated regions show higher error
+         because they were saved at a different quality/compression history
 
-    Falls back to 0 (clean) if image has fewer than 16 rows.
+    Score interpretation:
+      0–25   → uniform error levels → likely authentic
+      25–60  → elevated error in some regions → suspicious
+      60–100 → strong manipulation signal
+
+    Works on ANY JPEG — no prior knowledge of the image needed.
     """
-    arr = np.frombuffer(img_bytes, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
-    if img is None:
+    try:
+        # decode original
+        pil_orig = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    except Exception:
         return 0.0
 
-    h = img.shape[0]
-    valid_rows = [r for r in settings.ELA_SIGNATURE_ROWS if r < h]
-    if not valid_rows:
+    if pil_orig.width < 8 or pil_orig.height < 8:
         return 0.0
 
-    sig_pixels = img[valid_rows, :].astype(np.float32).flatten()
-    deviation = float(np.abs(sig_pixels - settings.ELA_SIGNATURE_VALUE).mean())
-    score = max(0.0, min(100.0, 100.0 - deviation * 1.2))
+    # re-compress at known quality
+    buf = io.BytesIO()
+    pil_orig.save(buf, format="JPEG", quality=75)
+    buf.seek(0)
+    try:
+        pil_recomp = Image.open(buf).convert("RGB")
+    except Exception:
+        return 0.0
+
+    orig_arr   = np.array(pil_orig,   dtype=np.float32)
+    recomp_arr = np.array(pil_recomp, dtype=np.float32)
+
+    # pixel-level absolute difference
+    diff = np.abs(orig_arr - recomp_arr)
+
+    # amplify so small differences become visible
+    ela_amplified = np.clip(diff * 10, 0, 255)
+
+    # score = mean intensity of amplified diff, normalised to 0-100
+    mean_error = float(ela_amplified.mean())
+    score = min(100.0, mean_error / 255.0 * 100.0 * 3.5)
+
     return round(score, 1)
 
 

@@ -24,7 +24,6 @@ import aio_pika
 import httpx
 
 from app.config import settings
-from app.schemas import AnalyzeRequest
 from app.services.analyzer import analyzer
 
 logger = logging.getLogger(__name__)

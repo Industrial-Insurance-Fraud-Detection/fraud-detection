@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import cv2
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -43,18 +42,27 @@ def make_clean_jpeg(width: int = 200, height: int = 200, seed: int = 0) -> bytes
 
 def make_manipulated_jpeg(width: int = 200, height: int = 200, seed: int = 0) -> bytes:
     """
-    Return JPEG bytes of a synthetic 'manipulated' image.
-    ELA signature written: rows 0,2,4,…,14 set to pixel value 42.
+    Return JPEG bytes of a 'manipulated' image using real ELA technique.
+    A patch saved at very different quality is pasted into the base image,
+    creating an error level discontinuity that real ELA detects.
     """
+    rng = np.random.default_rng(seed + 100)
+    # base image
     data = make_clean_jpeg(width, height, seed)
-    arr = np.frombuffer(data, dtype=np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    for r in range(0, 16, 2):
-        img[r, :, :] = 42
-    buf = io.BytesIO()
-    ok, encoded = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 95])
-    assert ok
-    return encoded.tobytes()
+    base_img = Image.open(io.BytesIO(data)).convert("RGB")
+
+    # patch with extreme quality difference
+    patch_arr = rng.integers(30, 220, (60, 60, 3), dtype=np.uint8)
+    patch_img = Image.fromarray(patch_arr)
+    patch_buf = io.BytesIO()
+    patch_img.save(patch_buf, format="JPEG", quality=5)
+    patch_buf.seek(0)
+    patch_reloaded = Image.open(patch_buf).convert("RGB")
+
+    base_img.paste(patch_reloaded, (40, 40))
+    out = io.BytesIO()
+    base_img.save(out, format="JPEG", quality=95)
+    return out.getvalue()
 
 
 def make_jpeg_with_exif(

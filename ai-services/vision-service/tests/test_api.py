@@ -134,3 +134,24 @@ class TestAnalyzeOptionalFields:
         assert r.status_code == 200
         body = r.json()
         assert "IMAGE_LOAD_FAILED" in body["indicators"]
+
+# ── security: URL scheme validation ──────────────────────────────────────────
+
+class TestUrlSecurity:
+    def test_file_scheme_rejected(self, client: TestClient):
+        """file:// URLs must be blocked to prevent SSRF."""
+        r = client.post("/analyze", json={
+            "photoPaths": ["file:///etc/passwd"],
+        })
+        # Service catches ValueError and returns fallback 200
+        # with IMAGE_LOAD_FAILED — not a 500 crash
+        assert r.status_code == 200
+        body = r.json()
+        assert "IMAGE_LOAD_FAILED" in body["indicators"]
+
+    def test_ftp_scheme_rejected(self, client: TestClient):
+        r = client.post("/analyze", json={
+            "photoPaths": ["ftp://evil.com/photo.jpg"],
+        })
+        assert r.status_code == 200
+        assert "IMAGE_LOAD_FAILED" in r.json()["indicators"]

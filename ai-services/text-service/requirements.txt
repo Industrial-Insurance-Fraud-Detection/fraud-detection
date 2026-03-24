@@ -1,0 +1,10 @@
+# requirements.txt
+# Install all of these with: pip install -r requirements.txt
+
+fastapi==0.115.0          # The web framework (our "waiter")
+uvicorn==0.30.0           # The server that runs FastAPI
+pydantic==2.8.0           # Data validation (checks inputs are correct)
+torch>=2.6.0              # PyTorch — runs the neural network
+transformers==4.46.0      # HuggingFace — loads BERT model
+safetensors>=0.4.5        # Reads your model.safetensors file
+python-multipart==0.0.9   # For handling file uploads

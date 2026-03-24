@@ -65,8 +65,8 @@ async def health():
     Liveness probe.
     Returns 200 with model_loaded=True when ready to serve /analyze.
     """
-    from pathlib import Path
-    model_loaded = Path(settings.MODEL_PATH).exists()
+    from app.services.analyzer import _yolo_model
+    model_loaded = _yolo_model is not None
     return HealthResponse(
         status="ok" if model_loaded else "degraded",
         model_loaded=model_loaded,
