@@ -71,19 +71,19 @@ Score = 0.35×anomaly + 0.25×classification + 0.20×NLP + 0.20×vision
 ```
 classification-service/
 ├── app/
-│   └── main.py                         # FastAPI app (port 8002)
-├── models/
-│   └── classification/
+│   ├── main.py                         # FastAPI app (port 8002)
+│   ├── config.py                       # Configuration & paths
+│   ├── schemas.py                      # Pydantic models
+│   └── models/                         # ML Logic & Artifacts
 │       ├── preprocessor.py             # Feature engineering
 │       ├── model.py                    # XGBoost training & inference
-│       └── artifacts/
-│           ├── classifier.pkl          # Modèle entraîné
-│           └── feature_importance.png  # Graphique importance
+│       ├── classifier.pkl              # Trained model
+│       └── feature_importance.png      # Feature importance graph
 ├── tests/
-│   └── test_preprocessor.py           # Tests unitaires
-├── train_maintenance.py               # Script d'entraînement
+│   ├── test_preprocessor.py            # Unit tests
+│   └── test_classification_service.py  # API & Integration tests
+├── .dockerignore
 ├── Dockerfile
-├── docker-compose.yml
 └── requirements.txt
 ```
 
