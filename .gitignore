@@ -32,7 +32,14 @@ ENV/
 *.weights
 *.bin
 ai-services/vision-service/app/models/
-
+# ── AI Model files (too large for GitHub) ─────────────────────────────────────
+*.safetensors
+*.pkl
+*.h5
+*.keras
+*.joblib
+ai-services/**/models/
+ai-services/**/model/
 # ── IDE ───────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
