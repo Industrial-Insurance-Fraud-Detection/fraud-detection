@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+.env
+.git/
+.gitignore
+
+# Test files — not needed in production image
+tests/
+pytest.ini
+
+# Model weights — mounted as volume at runtime, not baked into image
+app/models/*.pt
+app/models/*.onnx
+
+# Dev/docs
+README.md
+Dockerfile.gpu
+*.md

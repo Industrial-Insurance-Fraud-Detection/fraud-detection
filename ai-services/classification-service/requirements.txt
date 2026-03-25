@@ -7,4 +7,3 @@ fastapi
 uvicorn
 joblib
 python-multipart
-kagglehub

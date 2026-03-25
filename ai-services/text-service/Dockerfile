@@ -26,4 +26,4 @@ COPY model/ ./model/
 EXPOSE 8001
 
 # The command that runs when the container starts
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]

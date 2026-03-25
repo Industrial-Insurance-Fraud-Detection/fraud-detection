@@ -1,0 +1,4 @@
+# Training-only dependencies — not needed in the production Docker image
+# Run locally or in Kaggle: pip install -r requirements-train.txt
+-r requirements.txt
+kagglehub

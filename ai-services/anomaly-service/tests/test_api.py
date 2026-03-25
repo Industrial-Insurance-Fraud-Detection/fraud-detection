@@ -38,11 +38,6 @@ class TestHealth:
 # ── /detect-anomalies — validation ───────────────────────────────────────────
 
 class TestDetectAnomaliesValidation:
-    """
-    Verify that missing or malformed request fields return 422
-    before any model inference happens.
-    """
-
     def test_missing_csv_path_422(self, client: TestClient):
         r = client.post("/detect-anomalies", json={
             "claimId": "SIN-2026-001",
@@ -80,18 +75,12 @@ class TestDetectAnomaliesValidation:
 # ── /detect-anomalies — MinIO error handling ─────────────────────────────────
 
 class TestDetectAnomaliesMinioError:
-    """
-    When MinIO is not running locally, the endpoint must return 500
-    with a clear error message — not an unhandled crash.
-    """
-
     def test_minio_unavailable_returns_500(self, client: TestClient):
         r = client.post("/detect-anomalies", json={
             "csvPath": "claims/nonexistent.csv",
             "claimId": "SIN-2026-999",
             "claimDate": "2026-02-10",
         })
-        # MinIO is not running locally — must get 500, not a crash
         assert r.status_code == 500
 
     def test_500_has_error_message(self, client: TestClient):
@@ -107,12 +96,15 @@ class TestDetectAnomaliesMinioError:
 
 # ── /test-local — contract ────────────────────────────────────────────────────
 
-class TestLocalEndpointContract:
-    """
-    /test-local bypasses MinIO and runs on synthetic data.
-    Verifies the full response contract end-to-end.
-    """
+VALID_INDICATORS = {
+    "NO_PRECURSOR_DETECTED",
+    "ABRUPT_FAILURE",
+    "GRADUAL_DEGRADATION",
+    "MINOR_PRECURSORS_DETECTED",
+    "NORMAL",
+}
 
+class TestLocalEndpointContract:
     def _call(self, client: TestClient) -> dict:
         r = client.post("/test-local")
         assert r.status_code == 200, r.text
@@ -156,18 +148,6 @@ class TestLocalEndpointContract:
         assert isinstance(body["result"]["pre_incident_anomaly"], bool)
 
     def test_fraud_indicator_valid_value(self, client: TestClient):
-        valid = {
-            "NO_PRECURSOR_DETECTED",
-            "ABRUPT_FAILURE",
-            "GRADUAL_DEGRADATION",
-            "MINOR_PRECURSORS_DETECTED",
-            "NORMAL",
-            # spaces variant (current scorer.py) — remove once underscores are fixed
-            "NO PRECURSOR DETECTED",
-            "ABRUPT FAILURE",
-            "GRADUAL DEGRADATION",
-            "MINOR PRECURSORS DETECTED",
-        }
         body = self._call(client)
         indicator = body["result"]["fraud_indicator"]
-        assert indicator in valid, f"Unexpected fraud_indicator: {indicator}"
+        assert indicator in VALID_INDICATORS, f"Unexpected fraud_indicator: {indicator}"
