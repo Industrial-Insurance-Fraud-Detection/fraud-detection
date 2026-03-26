@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum Role {
+  CLIENT
+  INVESTIGATOR
+}
+
+enum ClaimStatus {
+  PENDING       // Just submitted, waiting for AI
+  ANALYZING     // Worker picked it up
+  HUMAN_REVIEW  // Score 30–69, needs investigator
+  APPROVED      // Score < 30 (auto) or investigator approved
+  REJECTED      // Score > 70 (auto) or investigator rejected
+}
+
+enum FileType {
+  CSV
+  PHOTO
+  PDF
+}
+
+enum DecisionType {
+  AUTO
+  HUMAN
+}
+
+enum DecisionOutcome {
+  APPROVED
+  REJECTED
+}
+
+// ─── Models ─────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(CLIENT)
+  firstName    String
+  lastName     String
+  company      String?
+  phone        String?
+  wilaya       String?
+  commune      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  equipment     Equipment[]
+  claims        Claim[]        @relation("ClientClaims")
+  decisions     Decision[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Equipment {
+  id             String   @id @default(cuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  type           String
+  manufacturer   String?
+  model          String?
+  serialNumber   String   @unique
+  commissionDate DateTime
+  location       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  claims Claim[]
+
+  @@map("equipment")
+}
+
+model Claim {
+  id            String      @id @default(cuid())
+  reference     String      @unique                    // SIN-2026-A7F3B2
+  clientId      String
+  client        User        @relation("ClientClaims", fields: [clientId], references: [id])
+  equipmentId   String
+  equipment     Equipment   @relation(fields: [equipmentId], references: [id])
+  incidentDate  DateTime
+  description   String
+  claimedAmount Float 
+  status        ClaimStatus @default(PENDING)
+  pdfUrl        String?     
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  files    ClaimFile[]
+  analysis AIAnalysis?
+  decision Decision?
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("claims")
+}
+
+model ClaimFile {
+  id        String   @id @default(cuid())
+  claimId   String
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fileType  FileType
+  minioPath String   // full object path in MinIO bucket
+  fileName  String   // original file name
+  fileSize  Int      // bytes
+  createdAt DateTime @default(now())
+
+  @@map("claim_files")
+}
+
+model AIAnalysis {
+  id                  String   @id @default(cuid())
+  claimId             String   @unique
+  claim               Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  // Individual model scores (0–100)
+  anomalyScore        Float    // Isolation Forest + LSTM  — weight 30%
+  classificationScore Float    // XGBoost                  — weight 25%
+  nlpScore            Float    // Multilingual BERT         — weight 25%
+  visionScore         Float    // YOLOv8 + ELA              — weight 20%
+
+  finalScore          Float    // Weighted aggregate 0–100
+  fraudClass          String   // "LOW" | "MEDIUM" | "HIGH"
+
+  // Full breakdown from each service stored as JSON
+  breakdown           Json
+
+  analyzedAt          DateTime @default(now())
+
+  @@map("ai_analyses")
+}
+
+model Decision {
+  id             String          @id @default(cuid())
+  claimId        String          @unique
+  claim          Claim           @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  type           DecisionType
+  outcome        DecisionOutcome
+  investigatorId String?
+  investigator   User?           @relation(fields: [investigatorId], references: [id])
+  notes          String?
+  decidedAt      DateTime        @default(now())
+
+  @@map("decisions")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  event     String
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
