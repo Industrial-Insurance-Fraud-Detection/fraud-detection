@@ -23,7 +23,7 @@ COPY main.py .
 COPY model/ ./model/
 
 # Tell Docker which port this service listens on
-EXPOSE 8001
+EXPOSE 8003
 
 # The command that runs when the container starts
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003"]
