@@ -20,11 +20,11 @@ import { Role } from '@prisma/client';
 import { EquipmentService } from './equipment.service';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
+import { EquipmentQueryDto } from './dto/equipment-query.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { PaginationDto } from '../common/dto/pagination.dto';
 
 /**
  * EquipmentController
@@ -56,21 +56,22 @@ export class EquipmentController {
    * GET /equipment
    * Returns a paginated list of active machines owned by this client.
    * Supports optional filtering by type and free-text search.
+   * EquipmentQueryDto whitelists page, limit, search, and type so the
+   * global forbidNonWhitelisted ValidationPipe does not reject them.
    */
   @Get()
   @ApiOperation({ summary: 'List my machines with pagination and search' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'type', required: false, type: String })
-  @ApiQuery({ name: 'search', required: false, type: String })
   @ApiResponse({ status: 200, description: 'Paginated list returned successfully' })
   findAll(
     @CurrentUser() user: any,
-    @Query() pagination: PaginationDto,
-    @Query('type') type?: string,
-    @Query('search') search?: string,
+    @Query() query: EquipmentQueryDto,
   ) {
-    return this.equipmentService.findAllForOwner(user.id, pagination, type, search);
+    return this.equipmentService.findAllForOwner(
+      user.id,
+      { page: query.page, limit: query.limit },
+      query.type,
+      query.search,
+    );
   }
 
   /**

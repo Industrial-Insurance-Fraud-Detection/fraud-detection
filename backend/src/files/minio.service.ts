@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Readable } from 'stream';
 import * as Minio from 'minio';
 
 @Injectable()
@@ -31,7 +32,7 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
-   * Upload a file to MinIO.
+   * Upload a multipart file (from an HTTP request) to MinIO.
    * Returns the object path (stored in ClaimFile.minioPath).
    */
   async upload(
@@ -47,6 +48,28 @@ export class MinioService implements OnModuleInit {
       { 'Content-Type': file.mimetype },
     );
     return objectName;
+  }
+
+  /**
+   * Upload a raw Buffer directly to MinIO under a given object name.
+   * Used internally for generated PDFs and other programmatic uploads.
+   * @param objectName  - Full MinIO object path (e.g. claims/id/decisions/file.pdf)
+   * @param buffer      - File content as a Buffer
+   * @param contentType - MIME type (e.g. 'application/pdf')
+   */
+  async uploadBuffer(
+    objectName: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<void> {
+    const readable = Readable.from(buffer);
+    await this.client.putObject(
+      this.bucket,
+      objectName,
+      readable,
+      buffer.length,
+      { 'Content-Type': contentType },
+    );
   }
 
   /**

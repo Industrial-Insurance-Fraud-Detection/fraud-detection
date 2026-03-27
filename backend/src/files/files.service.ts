@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Readable } from 'stream';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from './minio.service';
 import * as htmlPdf from 'html-pdf-node';
@@ -91,18 +92,8 @@ export class FilesService {
         // build MinIO object path
         const objectName = `claims/${claimId}/decisions/${Date.now()}-${fileName}`;
 
-        // upload buffer directly to MinIO
-        const stream = require('stream');
-        const readable = new stream.PassThrough();
-        readable.end(pdfBuffer);
-
-        await this.minio['client'].putObject(
-            this.minio['bucket'],
-            objectName,
-            readable,
-            pdfBuffer.length,
-            { 'Content-Type': 'application/pdf' },
-        );
+        // upload via the public MinioService method — no private property access
+        await this.minio.uploadBuffer(objectName, pdfBuffer, 'application/pdf');
 
         this.logger.log(`Decision PDF saved to MinIO: ${objectName}`);
 

@@ -26,7 +26,6 @@ export class EquipmentService {
    * Commission date must be in the past.
    */
   async create(ownerId: string, dto: CreateEquipmentDto) {
-    // validate commission date is not in the future
     const commissionDate = new Date(dto.commissionDate);
     if (commissionDate > new Date()) {
       throw new BadRequestException('commissionDate cannot be in the future');
@@ -55,18 +54,21 @@ export class EquipmentService {
    * Returns a paginated list of active machines owned by this client.
    * Supports filtering by type and free-text search on name, manufacturer, model.
    */
-  async findAllForOwner(ownerId: string, pagination: PaginationDto, type?: string, search?: string) {
+  async findAllForOwner(
+    ownerId: string,
+    pagination: PaginationDto,
+    type?: string,
+    search?: string,
+  ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
     const where: any = { ownerId, isActive: true };
 
-    // filter by equipment type if provided
     if (type) {
       where.type = type;
     }
 
-    // free-text search across name, manufacturer, model fields
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -124,12 +126,12 @@ export class EquipmentService {
   /**
    * Updates machine information.
    * Serial number cannot be changed after registration.
-   * Commission date cannot be changed to a future date.
+   * commissionDate and lastMaintenanceDate must be converted from
+   * ISO date strings to Date objects before passing to Prisma.
    */
   async update(id: string, ownerId: string, dto: UpdateEquipmentDto) {
     await this.findOne(id, ownerId);
 
-    // prevent changing commission date to the future
     if (dto.commissionDate) {
       const commissionDate = new Date(dto.commissionDate);
       if (commissionDate > new Date()) {
@@ -137,11 +139,27 @@ export class EquipmentService {
       }
     }
 
+    if (dto.lastMaintenanceDate) {
+      const lastMaintenance = new Date(dto.lastMaintenanceDate);
+      if (lastMaintenance > new Date()) {
+        throw new BadRequestException('lastMaintenanceDate cannot be in the future');
+      }
+    }
+
     return this.prisma.equipment.update({
       where: { id },
       data: {
-        ...dto,
-        commissionDate: dto.commissionDate ? new Date(dto.commissionDate) : undefined,
+        ...(dto.name && { name: dto.name }),
+        ...(dto.location && { location: dto.location }),
+        ...(dto.manufacturer && { manufacturer: dto.manufacturer }),
+        ...(dto.model && { model: dto.model }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.commissionDate && {
+          commissionDate: new Date(dto.commissionDate),
+        }),
+        ...(dto.lastMaintenanceDate && {
+          lastMaintenanceDate: new Date(dto.lastMaintenanceDate),
+        }),
       },
     });
   }

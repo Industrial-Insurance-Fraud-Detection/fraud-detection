@@ -284,7 +284,11 @@ export class ClaimsService {
   ) {
     const claim = await this.prisma.claim.findUnique({
       where: { id: claimId },
-      include: { client: true },
+      include: {
+        client: true,
+        equipment: true,
+        analysis: true,
+      },
     });
 
     if (!claim) throw new NotFoundException('Claim not found');
@@ -330,14 +334,34 @@ export class ClaimsService {
       `Votre sinistre ${claim.reference} a été ${outcomeText} après investigation.`,
     );
 
-    // trigger n8n webhook — non-blocking
+    // trigger n8n webhook with full payload for professional PDF generation
     this.triggerWebhook('human-decision', {
       claimId,
       reference: claim.reference,
       decision: dto.outcome,
       notes: dto.notes,
+      decidedAt: new Date().toISOString(),
+      // client info
+      clientId: claim.clientId,
       clientEmail: claim.client.email,
       clientName: `${claim.client.firstName} ${claim.client.lastName}`,
+      clientCompany: claim.client.company || '',
+      clientPhone: claim.client.phone || '',
+      clientWilaya: claim.client.wilaya || '',
+      // equipment info
+      equipmentName: claim.equipment.name,
+      equipmentType: claim.equipment.type,
+      // claim info
+      incidentDate: claim.incidentDate.toISOString(),
+      claimedAmount: claim.claimedAmount,
+      description: claim.description,
+      // AI scores
+      anomalyScore: claim.analysis?.anomalyScore ?? null,
+      classificationScore: claim.analysis?.classificationScore ?? null,
+      nlpScore: claim.analysis?.nlpScore ?? null,
+      visionScore: claim.analysis?.visionScore ?? null,
+      finalScore: claim.analysis?.finalScore ?? null,
+      fraudClass: claim.analysis?.fraudClass ?? null,
     }).catch((err) =>
       this.logger.warn(`n8n webhook human-decision failed: ${err.message}`),
     );
