@@ -18,8 +18,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
 
-// file upload limits
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB per file
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_FILES = 20;
 const MAX_CSV_FILES = 3;
 const MAX_PHOTO_FILES = 10;
@@ -37,27 +36,18 @@ export class ClaimsService {
     private readonly config: ConfigService,
   ) { }
 
-  /**
-   * CLIENT: Submit a new insurance claim with supporting files.
-   * Validates equipment ownership and active status.
-   * Requires at least 1 CSV sensor file and 1 photo.
-   * Files are uploaded to MinIO, job is pushed to RabbitMQ.
-   */
   async submitClaim(
     clientId: string,
     dto: CreateClaimDto,
     files: Express.Multer.File[],
   ) {
-    // validate incident date is not in the future
     const incidentDate = new Date(dto.incidentDate);
     if (incidentDate > new Date()) {
       throw new BadRequestException('incidentDate cannot be in the future');
     }
 
-    // validate equipment exists, is active, and belongs to this client
     await this.equipmentService.verifyActiveAndOwned(dto.equipmentId, clientId);
 
-    // validate file count
     if (!files || files.length === 0) {
       throw new BadRequestException('At least one file is required');
     }
@@ -65,7 +55,6 @@ export class ClaimsService {
       throw new BadRequestException(`Cannot upload more than ${MAX_FILES} files`);
     }
 
-    // categorize and validate files
     const csvFiles = files.filter(
       (f) => f.mimetype === 'text/csv' || f.originalname.endsWith('.csv'),
     );
@@ -87,7 +76,6 @@ export class ClaimsService {
       throw new BadRequestException(`Cannot upload more than ${MAX_PHOTO_FILES} photos`);
     }
 
-    // validate individual file sizes
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE_BYTES) {
         throw new BadRequestException(
@@ -96,10 +84,8 @@ export class ClaimsService {
       }
     }
 
-    // generate unique claim reference
     const reference = `SIN-${new Date().getFullYear()}-${uuidv4().slice(0, 6).toUpperCase()}`;
 
-    // save claim record to database
     const claim = await this.prisma.claim.create({
       data: {
         reference,
@@ -112,7 +98,6 @@ export class ClaimsService {
       },
     });
 
-    // upload all files to MinIO and record each in the database
     for (const file of files) {
       try {
         const minioPath = await this.minio.upload(claim.id, file);
@@ -137,18 +122,15 @@ export class ClaimsService {
       }
     }
 
-    // push async AI analysis job to RabbitMQ — non-blocking
     await this.queueProducer.publishAnalysisJob({ claimId: claim.id });
     this.logger.log(`Analysis job queued for claim ${reference}`);
 
-    // notify client that claim was received
     await this.notifications.create(
       clientId,
       'Sinistre reçu',
       `Votre sinistre ${reference} a été reçu et est en cours d'analyse IA.`,
     );
 
-    // trigger n8n webhook — non-blocking, failure does not affect response
     this.triggerWebhook('claim-received', {
       claimId: claim.id,
       reference,
@@ -168,10 +150,6 @@ export class ClaimsService {
     };
   }
 
-  /**
-   * CLIENT: Returns a paginated list of the authenticated client's claims.
-   * Sorted by most recent first.
-   */
   async findMyClaims(clientId: string, pagination: PaginationDto) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
@@ -194,10 +172,6 @@ export class ClaimsService {
     return paginate(data, total, page, limit);
   }
 
-  /**
-   * INVESTIGATOR: Returns paginated claims awaiting human review.
-   * Sorted by highest fraud score first — most urgent cases at the top.
-   */
   async getFlaggedClaims(pagination: PaginationDto) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
@@ -226,11 +200,6 @@ export class ClaimsService {
     return paginate(data, total, page, limit);
   }
 
-  /**
-   * BOTH: Returns full claim detail including files, AI analysis, and decision.
-   * CLIENT can only view their own claims.
-   * INVESTIGATOR can view any claim.
-   */
   async findOne(id: string, userId: string, userRole: string) {
     const claim = await this.prisma.claim.findUnique({
       where: { id },
@@ -263,8 +232,6 @@ export class ClaimsService {
 
     if (!claim) throw new NotFoundException('Claim not found');
 
-    // clients can only see their own claims
-    // return 404 instead of 403 to avoid revealing claim existence
     if (userRole === 'CLIENT' && claim.clientId !== userId) {
       throw new NotFoundException('Claim not found');
     }
@@ -273,15 +240,16 @@ export class ClaimsService {
   }
 
   /**
-   * INVESTIGATOR: Submit APPROVED or REJECTED decision with mandatory notes.
-   * Claim must be in HUMAN_REVIEW status.
-   * Decision and status update are atomic — both succeed or both fail.
+   * INVESTIGATOR: Submit APPROVED or REJECTED decision.
+   * Fires the same /human-decision webhook as auto-decisions
+   * so the same n8n workflow generates the PDF for all cases.
    */
   async submitDecision(
     claimId: string,
     investigatorId: string,
     dto: DecideClaimDto,
   ) {
+    // Include equipment and analysis so webhook payload is complete for PDF
     const claim = await this.prisma.claim.findUnique({
       where: { id: claimId },
       include: {
@@ -304,7 +272,6 @@ export class ClaimsService {
         ? ClaimStatus.APPROVED
         : ClaimStatus.REJECTED;
 
-    // atomic transaction — decision record + claim status update
     await this.prisma.$transaction([
       this.prisma.decision.create({
         data: {
@@ -325,43 +292,44 @@ export class ClaimsService {
       `Claim ${claim.reference} ${dto.outcome} by investigator ${investigatorId}`,
     );
 
-    // notify client of the decision
     const outcomeText =
       dto.outcome === DecisionOutcome.APPROVED ? 'approuvé' : 'rejeté';
+
     await this.notifications.create(
       claim.clientId,
       `Sinistre ${outcomeText}`,
       `Votre sinistre ${claim.reference} a été ${outcomeText} après investigation.`,
     );
 
-    // trigger n8n webhook with full payload for professional PDF generation
+    /*
+     * Fire to /human-decision — same endpoint used by auto-decisions.
+     * Includes AI scores from the analysis record so the PDF shows
+     * the full breakdown even for human decisions.
+     */
     this.triggerWebhook('human-decision', {
       claimId,
       reference: claim.reference,
-      decision: dto.outcome,
-      notes: dto.notes,
-      decidedAt: new Date().toISOString(),
-      // client info
       clientId: claim.clientId,
       clientEmail: claim.client.email,
       clientName: `${claim.client.firstName} ${claim.client.lastName}`,
-      clientCompany: claim.client.company || '',
-      clientPhone: claim.client.phone || '',
-      clientWilaya: claim.client.wilaya || '',
-      // equipment info
-      equipmentName: claim.equipment.name,
-      equipmentType: claim.equipment.type,
-      // claim info
-      incidentDate: claim.incidentDate.toISOString(),
-      claimedAmount: claim.claimedAmount,
+      clientPhone: claim.client.phone ?? 'N/A',
+      clientWilaya: claim.client.wilaya ?? 'N/A',
+      clientCompany: claim.client.company ?? 'N/A',
+      equipmentName: claim.equipment?.name ?? 'N/A',
+      equipmentType: claim.equipment?.type ?? 'N/A',
+      incidentDate: claim.incidentDate,
       description: claim.description,
-      // AI scores
+      claimedAmount: claim.claimedAmount,
+      outcome: dto.outcome,
+      notes: dto.notes,
+      decidedAt: new Date().toISOString(),
+      // AI scores from the analysis — present for human decisions too
+      finalScore: claim.analysis?.finalScore ?? null,
+      fraudClass: claim.analysis?.fraudClass ?? null,
       anomalyScore: claim.analysis?.anomalyScore ?? null,
       classificationScore: claim.analysis?.classificationScore ?? null,
       nlpScore: claim.analysis?.nlpScore ?? null,
       visionScore: claim.analysis?.visionScore ?? null,
-      finalScore: claim.analysis?.finalScore ?? null,
-      fraudClass: claim.analysis?.fraudClass ?? null,
     }).catch((err) =>
       this.logger.warn(`n8n webhook human-decision failed: ${err.message}`),
     );
@@ -374,10 +342,6 @@ export class ClaimsService {
     };
   }
 
-  /**
-   * Stores the decision letter PDF URL on the claim record.
-   * Called by n8n after generating and saving the PDF to MinIO.
-   */
   async savePdfUrl(claimId: string, pdfUrl: string) {
     await this.prisma.claim.update({
       where: { id: claimId },
@@ -389,10 +353,6 @@ export class ClaimsService {
     return { message: 'PDF URL saved successfully', claimId, pdfUrl };
   }
 
-  /**
-   * Detects the file type from MIME type or file extension.
-   * Used when saving file records to the database.
-   */
   private detectFileType(file: Express.Multer.File): FileType {
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
       return FileType.CSV;
@@ -403,10 +363,6 @@ export class ClaimsService {
     return FileType.PDF;
   }
 
-  /**
-   * Triggers an n8n automation webhook for workflow integration.
-   * Non-blocking — called with .catch() so failures never affect the response.
-   */
   private async triggerWebhook(event: string, payload: object): Promise<void> {
     const base =
       this.config.get('N8N_WEBHOOK_BASE') || 'http://localhost:5678/webhook';

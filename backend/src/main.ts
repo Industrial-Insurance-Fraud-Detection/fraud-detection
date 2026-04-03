@@ -1,3 +1,4 @@
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -44,10 +45,12 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // ✅ allow extra fields like "files"
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
     }),
   );
-
   /*
    * Global exception filter
    * Returns a uniform error shape for all thrown exceptions.

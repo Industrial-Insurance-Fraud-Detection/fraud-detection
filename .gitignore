@@ -60,6 +60,7 @@ node_modules/
 dist/
 .npm
 frontend/
+moch-ai/
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
 

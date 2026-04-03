@@ -19,10 +19,11 @@ import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { Public } from '../common/decorators/public.decorator';
 
 /**
  * NotificationsController
- * All endpoints require authentication.
+ * All endpoints require authentication except sendInternal.
  * No role restriction — both clients and investigators receive notifications.
  */
 @ApiTags('Notifications')
@@ -65,9 +66,11 @@ export class NotificationsController {
    * POST /notifications/internal
    * Called by n8n to send a notification to a specific user.
    * Used to notify clients when their decision letter PDF is ready.
+   * No auth required — internal n8n service call.
    */
   @Post('internal')
-  @ApiOperation({ summary: 'Send notification to a user (called by n8n)' })
+  @Public()
+  @ApiOperation({ summary: 'Send notification to a user (called by n8n — no auth required)' })
   @ApiResponse({ status: 201, description: 'Notification sent successfully' })
   async sendInternal(
     @Body() body: { userId: string; title: string; message: string },

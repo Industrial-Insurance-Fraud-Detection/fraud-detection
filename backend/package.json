@@ -13,6 +13,7 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
+    "studio": "prisma studio",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "db:migrate": "npx prisma migrate dev",

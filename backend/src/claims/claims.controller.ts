@@ -26,16 +26,10 @@ import { DecideClaimDto } from './dto/decide-claim.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 
-/**
- * ClaimsController
- * Handles all claim lifecycle endpoints.
- * CLIENT endpoints: submit, list own claims, view detail.
- * INVESTIGATOR endpoints: flagged queue, view detail, submit decision.
- * n8n endpoints: save PDF URL after decision letter generation.
- */
 @ApiTags('Claims')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -43,10 +37,6 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 export class ClaimsController {
   constructor(private readonly claimsService: ClaimsService) { }
 
-  /**
-   * POST /claims
-   * CLIENT submits a new claim with supporting files.
-   */
   @Post()
   @Roles(Role.CLIENT)
   @ApiOperation({ summary: 'Submit a new claim with files (CSV + photos + PDF)' })
@@ -64,10 +54,6 @@ export class ClaimsController {
     return this.claimsService.submitClaim(user.id, dto, files || []);
   }
 
-  /**
-   * GET /claims/my
-   * CLIENT gets their own claims with pagination.
-   */
   @Get('my')
   @Roles(Role.CLIENT)
   @ApiOperation({ summary: 'List my claims with pagination' })
@@ -81,10 +67,6 @@ export class ClaimsController {
     return this.claimsService.findMyClaims(user.id, pagination);
   }
 
-  /**
-   * GET /claims/flagged
-   * INVESTIGATOR gets all claims awaiting human review.
-   */
   @Get('flagged')
   @Roles(Role.INVESTIGATOR)
   @ApiOperation({ summary: 'Get flagged claims queue sorted by fraud score (INVESTIGATOR)' })
@@ -96,12 +78,6 @@ export class ClaimsController {
     return this.claimsService.getFlaggedClaims(pagination);
   }
 
-  /**
-   * GET /claims/:id
-   * Returns full claim detail.
-   * CLIENT can only view their own claims.
-   * INVESTIGATOR can view any claim.
-   */
   @Get(':id')
   @ApiOperation({ summary: 'Get full claim detail' })
   @ApiResponse({ status: 200, description: 'Claim returned successfully' })
@@ -110,10 +86,6 @@ export class ClaimsController {
     return this.claimsService.findOne(id, user.id, user.role);
   }
 
-  /**
-   * PATCH /claims/:id/decide
-   * INVESTIGATOR submits APPROVED or REJECTED with mandatory notes.
-   */
   @Patch(':id/decide')
   @Roles(Role.INVESTIGATOR)
   @ApiOperation({ summary: 'Submit human decision on a flagged claim (INVESTIGATOR)' })
@@ -131,10 +103,11 @@ export class ClaimsController {
 
   /**
    * PATCH /claims/:id/pdf-url
-   * Called by n8n to store the decision letter PDF URL on the claim.
-   * No role restriction — called by internal service with JWT token.
+   * Called by n8n after generating the decision letter PDF.
+   * @Public() bypasses JwtAuthGuard — n8n is an internal service with no user token.
    */
   @Patch(':id/pdf-url')
+  @Public()
   @ApiOperation({ summary: 'Store decision PDF URL on claim (called by n8n)' })
   @ApiResponse({ status: 200, description: 'PDF URL saved successfully' })
   savePdfUrl(

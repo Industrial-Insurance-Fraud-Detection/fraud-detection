@@ -17,8 +17,17 @@ export class NotificationsService {
   /**
    * Creates a notification for a user.
    * Called internally by ClaimsService — not exposed as an HTTP endpoint.
+   * Guards against undefined userId to prevent Prisma validation errors
+   * when called from n8n with missing or malformed payload.
    */
   async create(userId: string, title: string, message: string) {
+    if (!userId) {
+      this.logger.warn(
+        `Notification skipped — userId is undefined. title: "${title}"`,
+      );
+      return null;
+    }
+
     const notification = await this.prisma.notification.create({
       data: { userId, title, message },
     });
