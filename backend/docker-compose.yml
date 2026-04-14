@@ -1,7 +1,4 @@
-version: '3.9'
-
 services:
-  # ── PostgreSQL ─────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: taamine_postgres
@@ -20,7 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis ──────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: taamine_redis
@@ -28,7 +24,6 @@ services:
     ports:
       - '6379:6379'
 
-  # ── RabbitMQ ───────────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: taamine_rabbitmq
@@ -38,14 +33,13 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     ports:
       - '5672:5672'
-      - '15672:15672'   # Management UI
+      - '15672:15672'
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', 'ping']
       interval: 15s
       timeout: 10s
       retries: 5
 
-  # ── MinIO ──────────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
     container_name: taamine_minio
@@ -58,9 +52,8 @@ services:
       - minio_data:/data
     ports:
       - '9000:9000'
-      - '9001:9001'   # Console UI
+      - '9001:9001'
 
-  # ── n8n ────────────────────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
     container_name: taamine_n8n
@@ -73,7 +66,6 @@ services:
     ports:
       - '5678:5678'
 
-  # ── NestJS Backend ─────────────────────────────────────────────
   backend:
     build:
       context: .
@@ -92,9 +84,6 @@ services:
         condition: service_started
       minio:
         condition: service_started
-    volumes:
-      - .:/app
-      - /app/node_modules
 
 volumes:
   postgres_data:
