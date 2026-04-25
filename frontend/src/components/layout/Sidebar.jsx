@@ -2,32 +2,36 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth.store'
 
-// Hook mode sombre global
+// ── Dark mode helper hook ─────────────────────────────────────────────────────
 export function useDarkMode() {
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true')
   const toggle = () => {
     setDark(d => {
-      localStorage.setItem('darkMode', !d)
+      localStorage.setItem('darkMode', String(!d))
       return !d
     })
   }
   return [dark, toggle]
 }
 
+// ── Nav items per role ────────────────────────────────────────────────────────
 const CLIENT_ITEMS = [
-  { key: '/client/dashboard',  label: 'Tableau de bord',  icon: '▦' },
-  { key: '/client/new-claim',  label: 'Nouveau sinistre', icon: '+' },
-  { key: '/client/claims',     label: 'Mes sinistres',    icon: '≡' },
-  { key: '/client/stats',      label: 'Statistiques',     icon: '◉' },
-  { key: '/client/profile',    label: 'Mon profil',       icon: '👤' },
+  { key: '/client/dashboard', label: 'Tableau de bord', icon: '▦' },
+  { key: '/client/new-claim', label: 'Nouveau sinistre', icon: '+' },
+  { key: '/client/claims', label: 'Mes sinistres', icon: '≡' },
+  { key: '/client/stats', label: 'Statistiques', icon: '◉' },
+  { key: '/client/profile', label: 'Mon profil', icon: '👤' },
 ]
 
 const INVESTIGATOR_ITEMS = [
-  { key: '/investigator/dashboard', label: 'Tableau de bord',    icon: '▦' },
-  { key: '/investigator/flagged',   label: 'Dossiers a traiter', icon: '⚑', badge: true },
-  { key: '/investigator/history',   label: 'Historique',         icon: '≡' },
+  { key: '/investigator/dashboard', label: 'Tableau de bord', icon: '▦' },
+  { key: '/investigator/flagged', label: 'Dossiers a traiter', icon: '⚑', badge: true },
+  { key: '/investigator/history', label: 'Historique', icon: '≡' },
+  { key: '/investigator/stats', label: 'Statistiques', icon: '◑' },
+  { key: '/investigator/profile', label: 'Mon profil', icon: '👤' },
 ]
 
+// ── Sidebar component ─────────────────────────────────────────────────────────
 export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -36,13 +40,19 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
 
   const items = role === 'CLIENT' ? CLIENT_ITEMS : INVESTIGATOR_ITEMS
   const active = location.pathname
+  const width = collapsed ? 64 : 240
 
-  const bg     = dark ? '#0A1628' : '#0F2347'
+  const bg = dark ? '#0A1628' : '#0F2347'
   const border = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)'
-  const width  = collapsed ? 64 : 240
 
-  const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Utilisateur'
-  const initiale = user?.firstName?.[0]?.toUpperCase() || 'U'
+  // Build display name from firstName + lastName (backend never returns fullName)
+  const fullName = user
+    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Utilisateur'
+    : 'Utilisateur'
+  const initiale = (user?.firstName?.[0] ?? user?.email?.[0] ?? 'U').toUpperCase()
+  const subtitle = role === 'CLIENT'
+    ? (user?.company || 'Client')
+    : 'Investigateur'
 
   return (
     <div style={{
@@ -51,10 +61,10 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
       position: 'fixed', left: 0, top: 0, zIndex: 100,
       transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
-      boxShadow: '4px 0 24px rgba(0,0,0,0.15)'
+      boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
     }}>
 
-      {/* Logo + collapse button */}
+      {/* ── Logo + collapse ───────────────────────────────────────────────── */}
       <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -68,31 +78,28 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
           </div>
         )}
         {collapsed && (
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#0F2347', fontSize: '1rem', margin: '0 auto' }}>F</div>
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#0F2347', fontSize: '1rem', margin: '0 auto', cursor: 'pointer' }}
+            onClick={() => setCollapsed(false)}>F</div>
         )}
         {!collapsed && (
           <button onClick={() => setCollapsed(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '1rem', padding: '0.25rem', borderRadius: 4, transition: 'color 0.2s' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '1rem', padding: '0.25rem', borderRadius: 4 }}
             onMouseEnter={e => e.target.style.color = 'white'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.3)'}>
-            ←
-          </button>
+            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.3)'}>←</button>
         )}
       </div>
 
-      {/* Expand button quand collapsed */}
+      {/* Expand button when collapsed */}
       {collapsed && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', borderBottom: `1px solid ${border}` }}>
           <button onClick={() => setCollapsed(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '1rem', padding: '0.25rem' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '1rem' }}
             onMouseEnter={e => e.target.style.color = 'white'}
-            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.3)'}>
-            →
-          </button>
+            onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.3)'}>→</button>
         </div>
       )}
 
-      {/* User info — expanded */}
+      {/* ── User info ────────────────────────────────────────────────────── */}
       {!collapsed && (
         <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -101,15 +108,11 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
             </div>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', whiteSpace: 'nowrap' }}>
-                {role === 'CLIENT' ? (user?.company || 'Client') : 'Investigateur'}
-              </div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', whiteSpace: 'nowrap' }}>{subtitle}</div>
             </div>
           </div>
         </div>
       )}
-
-      {/* User info — collapsed */}
       {collapsed && (
         <div style={{ padding: '0.75rem', display: 'flex', justifyContent: 'center', borderBottom: `1px solid ${border}` }}>
           <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700 }}>
@@ -118,7 +121,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         </div>
       )}
 
-      {/* Nav */}
+      {/* ── Nav items ────────────────────────────────────────────────────── */}
       <nav style={{ flex: 1, padding: '0.75rem 0', overflowY: 'auto' }}>
         {items.map(item => {
           const isActive = active === item.key || active.startsWith(item.key + '/')
@@ -136,7 +139,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
                 borderLeft: isActive ? '3px solid #C9A84C' : '3px solid transparent',
                 borderRight: '3px solid transparent',
                 transition: 'all 0.18s',
-                position: 'relative'
+                position: 'relative',
               }}
               onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
               onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent' }}>
@@ -157,11 +160,12 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         })}
       </nav>
 
-      {/* Footer */}
+      {/* ── Footer / logout ──────────────────────────────────────────────── */}
       <div style={{ padding: collapsed ? '0.75rem' : '1rem 1.5rem', borderTop: `1px solid ${border}` }}>
-        <div onClick={() => { logout(); window.location.href = '/login' }}
-          style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', padding: '0.4rem', borderRadius: 6, transition: 'background 0.15s' }}
+        <div
+          onClick={() => { logout(); window.location.href = '/login' }}
           title={collapsed ? 'Deconnexion' : ''}
+          style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', padding: '0.4rem', borderRadius: 6, transition: 'background 0.15s' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
           onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
           <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '1rem' }}>↩</span>

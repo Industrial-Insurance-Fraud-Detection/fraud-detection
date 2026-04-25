@@ -5,8 +5,6 @@ import { useDarkMode } from '../../components/layout/Sidebar'
 import NotificationBell from '../../components/ui/NotificationBell'
 import useAuthStore from '../../store/auth.store'
 
-<<<<<<< HEAD
-=======
 /**
  * InvestigatorStats
  *
@@ -33,36 +31,24 @@ function clientName(client) {
   return `${client?.firstName || ''} ${client?.lastName || ''}`.trim() || 'Client'
 }
 
->>>>>>> a259412 (frontend v2 not completed)
 function InvestigatorSidebar({ dark }) {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const items = [
-<<<<<<< HEAD
-    { key: '/investigator/dashboard', label: 'Tableau de bord',    icon: '▦' },
-    { key: '/investigator/flagged',   label: 'Dossiers a traiter', icon: '⚑' },
-    { key: '/investigator/history',   label: 'Historique',         icon: '≡' },
-    { key: '/investigator/stats',     label: 'Statistiques',       icon: '◑' },
-    { key: '/investigator/profile',   label: 'Mon profil',         icon: '👤' },
-=======
     { key: '/investigator/dashboard', label: 'Tableau de bord', icon: '▦' },
     { key: '/investigator/flagged', label: 'Dossiers a traiter', icon: '⚑' },
     { key: '/investigator/history', label: 'Historique', icon: '≡' },
     { key: '/investigator/stats', label: 'Statistiques', icon: '◑' },
     { key: '/investigator/profile', label: 'Mon profil', icon: '👤' },
->>>>>>> a259412 (frontend v2 not completed)
   ]
   const bg = dark ? '#0A1628' : '#0F2347'
   const border = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)'
   const width = collapsed ? 64 : 240
   const active = window.location.pathname
-<<<<<<< HEAD
-=======
   const initial = user?.firstName?.[0]?.toUpperCase() || 'I'
   const invName = clientName(user)
 
->>>>>>> a259412 (frontend v2 not completed)
   return (
     <div style={{ width, minHeight: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', position: 'fixed', left: 0, top: 0, zIndex: 100, transition: 'width 0.25s', overflow: 'hidden', boxShadow: '4px 0 24px rgba(0,0,0,0.15)' }}>
       <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -84,17 +70,9 @@ function InvestigatorSidebar({ dark }) {
       {!collapsed && (
         <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-<<<<<<< HEAD
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700 }}>
-              {user?.fullName?.[0]?.toUpperCase() || 'I'}
-            </div>
-            <div>
-              <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{user?.fullName}</div>
-=======
             <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700 }}>{initial}</div>
             <div>
               <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{invName}</div>
->>>>>>> a259412 (frontend v2 not completed)
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Investigateur senior</div>
             </div>
           </div>
@@ -147,13 +125,9 @@ function BarChart({ data, dark }) {
   const textMain = dark ? 'white' : '#0F2347'
   return (
     <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
-<<<<<<< HEAD
-      <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Distribution des scores IA</h3>
-=======
       <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>
         Distribution des scores IA (dossiers en revision)
       </h3>
->>>>>>> a259412 (frontend v2 not completed)
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem', height: 160 }}>
         {data.map((d, i) => (
           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
@@ -168,44 +142,12 @@ function BarChart({ data, dark }) {
 }
 
 export default function InvestigatorStats() {
-<<<<<<< HEAD
-  const [stats, setStats] = useState(null)
-=======
   // FIX — removed /claims/stats call (endpoint doesn't exist)
->>>>>>> a259412 (frontend v2 not completed)
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(true)
   const [dark, toggleDark] = useDarkMode()
 
   useEffect(() => {
-<<<<<<< HEAD
-    Promise.all([
-      api.get('/claims/stats').catch(() => ({ data: {} })),
-      api.get('/claims/flagged').catch(() => ({ data: [] })),
-    ]).then(([statsRes, claimsRes]) => {
-      setStats(statsRes.data)
-      setClaims(claimsRes.data)
-    }).finally(() => setLoading(false))
-  }, [])
-
-  const pageBg    = dark ? '#0D1626' : '#F7F8FC'
-  const cardBg    = dark ? '#111C30' : 'white'
-  const cardBorder= dark ? '#1E2D45' : '#EEF0F6'
-  const textMain  = dark ? 'white' : '#0F2347'
-  const textSub   = dark ? '#5A7A9A' : '#9CA3AF'
-
-  const scoreDistrib = [
-    { label: '0-20', value: claims.filter(c => (c.finalScore||50) <= 20).length, color: '#1A7A4A' },
-    { label: '21-40', value: claims.filter(c => (c.finalScore||50) > 20 && (c.finalScore||50) <= 40).length, color: '#27AE60' },
-    { label: '41-60', value: claims.filter(c => (c.finalScore||50) > 40 && (c.finalScore||50) <= 60).length, color: '#F39C12' },
-    { label: '61-80', value: claims.filter(c => (c.finalScore||50) > 60 && (c.finalScore||50) <= 80).length, color: '#E67E22' },
-    { label: '81-100', value: claims.filter(c => (c.finalScore||50) > 80).length, color: '#C0392B' },
-  ]
-
-  const totalDecided = (stats?.approved || 0) + (stats?.rejected || 0)
-  const approvalRate = totalDecided > 0 ? Math.round((stats?.approved / totalDecided) * 100) : 0
-
-=======
     api.get('/claims/flagged')
       .then(res => setClaims(extractArray(res.data)))
       .catch(err => console.error(err))
@@ -234,7 +176,6 @@ export default function InvestigatorStats() {
     { label: '81-100', value: claims.filter(c => (c.analysis?.finalScore ?? 50) > 80).length, color: '#C0392B' },
   ]
 
->>>>>>> a259412 (frontend v2 not completed)
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif' }}>
       <InvestigatorSidebar dark={dark} />
@@ -243,15 +184,10 @@ export default function InvestigatorStats() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
           <div>
             <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Analyse</p>
-<<<<<<< HEAD
-            <h1 style={{ fontSize: '1.9rem', color: textMain, fontWeight: 400 }}>Statistiques <strong>globales</strong></h1>
-            <p style={{ color: textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>Vue d'ensemble du systeme de detection</p>
-=======
             <h1 style={{ fontSize: '1.9rem', color: textMain, fontWeight: 400 }}>Statistiques <strong>dossiers en revision</strong></h1>
             <p style={{ color: textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
               Donnees issues des sinistres en cours d'examen humain
             </p>
->>>>>>> a259412 (frontend v2 not completed)
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <NotificationBell dark={dark} />
@@ -265,38 +201,6 @@ export default function InvestigatorStats() {
           <div style={{ textAlign: 'center', padding: '3rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Chargement...</div>
         ) : (
           <>
-<<<<<<< HEAD
-            {/* Stats cards */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-              <StatCard dark={dark} label="Total sinistres"   value={stats?.total || 0}        sub="Tous statuts"         />
-              <StatCard dark={dark} label="Approuves"         value={stats?.approved || 0}     sub="Auto + manuel"        color="#1A7A4A" />
-              <StatCard dark={dark} label="Rejetes"           value={stats?.rejected || 0}     sub="Fraude detectee"      color="#C0392B" />
-              <StatCard dark={dark} label="En revision"       value={stats?.humanReview || 0}  sub="A traiter"            color="#7D6608" />
-              <StatCard dark={dark} label="Taux approbation" value={`${approvalRate}%`}        sub="Sur decisions prises" color="#2E86C1" />
-            </div>
-
-            {/* Graphiques */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-              <BarChart data={scoreDistrib} dark={dark} />
-
-              {/* Repartition statuts */}
-              <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
-                <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Repartition des statuts</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {[
-                    { label: 'Approuves',   value: stats?.approved || 0,    total: stats?.total || 1, color: '#1A7A4A' },
-                    { label: 'Rejetes',     value: stats?.rejected || 0,    total: stats?.total || 1, color: '#C0392B' },
-                    { label: 'En revision', value: stats?.humanReview || 0, total: stats?.total || 1, color: '#F39C12' },
-                    { label: 'En attente',  value: stats?.pending || 0,     total: stats?.total || 1, color: '#1A5276' },
-                  ].map(item => (
-                    <div key={item.label}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                        <span style={{ fontSize: '0.82rem', color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.label}</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: item.color, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.value} ({Math.round(item.value/item.total*100)}%)</span>
-                      </div>
-                      <div style={{ height: 8, backgroundColor: dark ? '#1E2D45' : '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(item.value/item.total)*100}%`, backgroundColor: item.color, borderRadius: 4, transition: 'width 0.8s ease' }} />
-=======
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
               <StatCard dark={dark} label="Dossiers en revision" value={total} sub="Statut HUMAN_REVIEW" />
               <StatCard dark={dark} label="Urgents (score ≥ 60)" value={urgent} sub="Priorite haute" color="#C0392B" />
@@ -321,7 +225,6 @@ export default function InvestigatorStats() {
                       <div>
                         <div style={{ fontWeight: 600, color: item.color, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '0.85rem' }}>{item.label}</div>
                         <div style={{ color: '#6B7280', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '0.75rem', marginTop: 2 }}>{item.desc}</div>
->>>>>>> a259412 (frontend v2 not completed)
                       </div>
                     </div>
                   ))}
@@ -329,22 +232,6 @@ export default function InvestigatorStats() {
               </div>
             </div>
 
-<<<<<<< HEAD
-            {/* Info systeme IA */}
-            <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
-              <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Performance du systeme IA</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                {[
-                  { label: 'Modele 1', name: 'Anomalie LSTM', status: 'Actif', color: '#1A7A4A', poids: '35%' },
-                  { label: 'Modele 2', name: 'XGBoost',       status: 'Bientot', color: '#F39C12', poids: '25%' },
-                  { label: 'Modele 3', name: 'BERT NLP',      status: 'Bientot', color: '#F39C12', poids: '20%' },
-                  { label: 'Modele 4', name: 'YOLOv8 Vision', status: 'Bientot', color: '#F39C12', poids: '20%' },
-                ].map(m => (
-                  <div key={m.label} style={{ padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}` }}>
-                    <div style={{ fontSize: '0.7rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>{m.label} — {m.poids}</div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.4rem' }}>{m.name}</div>
-                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: m.color === '#1A7A4A' ? '#F0FAF4' : '#FEF9E7', color: m.color, border: `1px solid ${m.color === '#1A7A4A' ? '#B8E4CA' : '#F7DC6F'}` }}>
-=======
             {/* AI models info */}
             <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
               <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Modeles IA du systeme</h3>
@@ -359,7 +246,6 @@ export default function InvestigatorStats() {
                     <div style={{ fontSize: '0.7rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>{m.label} — {m.poids}</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.4rem' }}>{m.name}</div>
                     <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: m.bg, color: m.color, border: `1px solid ${m.border}` }}>
->>>>>>> a259412 (frontend v2 not completed)
                       {m.status}
                     </span>
                   </div>

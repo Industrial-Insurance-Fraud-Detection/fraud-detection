@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-import { useState, useEffect } from 'react'
-import api from '../api/axios'
-
-=======
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api/axios'
 
@@ -20,7 +15,6 @@ import api from '../api/axios'
  *          without prop errors. The backend has no delete-all endpoint so
  *          clearAll only hides notifications locally until next poll.
  */
->>>>>>> a259412 (frontend v2 not completed)
 function extractArray(data) {
   if (Array.isArray(data)) return data
   if (Array.isArray(data?.items)) return data.items
@@ -32,19 +26,6 @@ function extractArray(data) {
 export function useNotifications() {
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
-<<<<<<< HEAD
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications')        // ✅ corrigé
-      const safeNotifications = extractArray(res.data?.data || res.data)
-      setNotifications(safeNotifications)
-      setUnreadCount(safeNotifications.filter(n => !n.isRead).length)
-    } catch {
-      // silencieux si non connecté
-    }
-  }
-=======
   const [connected, setConnected] = useState(false)
 
   const fetchNotifications = useCallback(async () => {
@@ -59,22 +40,11 @@ export function useNotifications() {
       // Stay silent if not authenticated yet
     }
   }, [])
->>>>>>> a259412 (frontend v2 not completed)
 
   const markAsRead = async (id) => {
     try {
       await api.patch(`/notifications/${id}/read`)
       fetchNotifications()
-<<<<<<< HEAD
-    } catch {}
-  }
-
-  const markAllAsRead = async () => {
-    try {
-      await api.patch('/notifications/read-all')
-      fetchNotifications()
-    } catch {}
-=======
     } catch { }
   }
 
@@ -90,18 +60,10 @@ export function useNotifications() {
   const clearAll = () => {
     setNotifications([])
     setUnreadCount(0)
->>>>>>> a259412 (frontend v2 not completed)
   }
 
   useEffect(() => {
     fetchNotifications()
-<<<<<<< HEAD
-    const interval = setInterval(fetchNotifications, 30000) // polling 30s
-    return () => clearInterval(interval)
-  }, [])
-
-  return { notifications, unreadCount, markAsRead, markAllAsRead }
-=======
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
@@ -115,5 +77,4 @@ export function useNotifications() {
     markAllAsRead: markAllRead, // legacy alias
     clearAll,
   }
->>>>>>> a259412 (frontend v2 not completed)
 }

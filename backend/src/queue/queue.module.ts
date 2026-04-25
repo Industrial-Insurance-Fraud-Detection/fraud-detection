@@ -7,7 +7,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    RabbitMQModule.forRootAsync(RabbitMQModule, {
+    RabbitMQModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         uri: config.get<string>('RABBITMQ_URL') || 'amqp://guest:guest@localhost:5672',
@@ -17,7 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
             type: 'direct',
           },
         ],
-        connectionInitOptions: { wait: false }, // don't block startup if RabbitMQ not ready
+        connectionInitOptions: { wait: false },
       }),
       inject: [ConfigService],
     }),
@@ -26,4 +26,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [QueueProducer, QueueWorker],
   exports: [QueueProducer],
 })
-export class QueueModule {}
+export class QueueModule { }
