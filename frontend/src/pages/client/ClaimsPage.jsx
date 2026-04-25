@@ -3,11 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import Sidebar, { useDarkMode } from '../../components/layout/Sidebar'
 
+<<<<<<< HEAD
 const STATUS_CONFIG = {
   APPROVED:     { label: 'Approuve',         bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA' },
   REJECTED:     { label: 'Rejete',           bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE' },
   PENDING:      { label: 'En attente',       bg: '#FEF9E7', color: '#7D6608', border: '#F7DC6F' },
   ANALYZING:    { label: 'Analyse en cours', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
+=======
+/**
+ * ClaimsPage
+ *
+ * FIX 1 — `claim.claimedAmount` not `claim.amount`.
+ * FIX 2 — `claim.equipment` is an object; use `claim.equipment?.name`.
+ * FIX 3 — Score lives in `claim.analysis?.finalScore`.
+ */
+
+const STATUS_CONFIG = {
+  APPROVED: { label: 'Approuve', bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA' },
+  REJECTED: { label: 'Rejete', bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE' },
+  PENDING: { label: 'En attente', bg: '#FEF9E7', color: '#7D6608', border: '#F7DC6F' },
+  ANALYZING: { label: 'Analyse en cours', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
+>>>>>>> a259412 (frontend v2 not completed)
   HUMAN_REVIEW: { label: 'Revision humaine', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
 }
 
@@ -22,7 +38,11 @@ export default function ClaimsPage() {
   useEffect(() => {
     api.get('/claims/my')
       .then(res => {
+<<<<<<< HEAD
         const data = res.data?.data?.items || res.data?.data || res.data || []
+=======
+        const data = res.data?.data?.data || res.data?.data || res.data || []
+>>>>>>> a259412 (frontend v2 not completed)
         setClaims(Array.isArray(data) ? data : [])
       })
       .catch(err => console.error(err))
@@ -30,13 +50,21 @@ export default function ClaimsPage() {
   }, [])
 
   const filtered = claims.filter(c => {
+<<<<<<< HEAD
     const equipName = c.equipment?.name || c.equipment || ''
     const matchSearch = c.reference?.toLowerCase().includes(search.toLowerCase()) ||
+=======
+    // FIX 2 — equipment is object
+    const equipName = c.equipment?.name || ''
+    const matchSearch =
+      c.reference?.toLowerCase().includes(search.toLowerCase()) ||
+>>>>>>> a259412 (frontend v2 not completed)
       equipName.toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === 'ALL' || c.status === filterStatus
     return matchSearch && matchStatus
   })
 
+<<<<<<< HEAD
   const pageBg     = dark ? '#0D1626' : '#F7F8FC'
   const cardBg     = dark ? '#111C30' : 'white'
   const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
@@ -44,6 +72,15 @@ export default function ClaimsPage() {
   const textSub    = dark ? '#5A7A9A' : '#9CA3AF'
   const textBody   = dark ? '#C8D8E8' : '#4B5563'
   const rowHover   = dark ? '#172338' : '#F9FAFB'
+=======
+  const pageBg = dark ? '#0D1626' : '#F7F8FC'
+  const cardBg = dark ? '#111C30' : 'white'
+  const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
+  const textMain = dark ? 'white' : '#0F2347'
+  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
+  const textBody = dark ? '#C8D8E8' : '#4B5563'
+  const rowHover = dark ? '#172338' : '#F9FAFB'
+>>>>>>> a259412 (frontend v2 not completed)
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif', transition: 'background 0.3s' }}>
@@ -71,7 +108,11 @@ export default function ClaimsPage() {
           <input placeholder="Rechercher par reference ou equipement..."
             value={search} onChange={e => setSearch(e.target.value)}
             style={{ padding: '0.6rem 1rem', border: `1.5px solid ${cardBorder}`, borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', outline: 'none', width: 280, backgroundColor: cardBg, color: textMain }} />
+<<<<<<< HEAD
           {[['ALL','Tous'],['APPROVED','Approuves'],['REJECTED','Rejetes'],['HUMAN_REVIEW','Revision'],['ANALYZING','En analyse']].map(([f, l]) => (
+=======
+          {[['ALL', 'Tous'], ['APPROVED', 'Approuves'], ['REJECTED', 'Rejetes'], ['HUMAN_REVIEW', 'Revision'], ['ANALYZING', 'En analyse']].map(([f, l]) => (
+>>>>>>> a259412 (frontend v2 not completed)
             <button key={f} onClick={() => setFilterStatus(f)}
               style={{ padding: '0.4rem 0.85rem', border: `1.5px solid ${filterStatus === f ? '#0F2347' : cardBorder}`, borderRadius: 6, fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: filterStatus === f ? '#0F2347' : cardBg, color: filterStatus === f ? 'white' : textSub, fontWeight: filterStatus === f ? 600 : 400 }}>
               {l}
@@ -90,10 +131,20 @@ export default function ClaimsPage() {
           )}
 
           {filtered.map(claim => {
+<<<<<<< HEAD
             const sc    = STATUS_CONFIG[claim.status] || STATUS_CONFIG['PENDING']
             const score = claim.finalScore
             const equipName = claim.equipment?.name || claim.equipment || '-'
             const amount = claim.claimedAmount || claim.amount
+=======
+            const sc = STATUS_CONFIG[claim.status] || STATUS_CONFIG['PENDING']
+            // FIX 3 — nested analysis
+            const score = claim.analysis?.finalScore
+            // FIX 2 — equipment object
+            const equipName = claim.equipment?.name || '-'
+            // FIX 1 — claimedAmount
+            const amount = claim.claimedAmount
+>>>>>>> a259412 (frontend v2 not completed)
             return (
               <div key={claim.id}
                 onClick={() => navigate(`/client/claims/${claim.id}`)}

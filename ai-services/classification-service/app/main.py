@@ -9,18 +9,18 @@ from fastapi.responses import RedirectResponse, FileResponse
 from minio import Minio
 
 # Internal imports
-from config import (
+from app.config import (
     SERVICE_NAME, SERVICE_VERSION, SERVICE_PORT,
     MODEL_PATH, FEATURE_IMPORTANCE_PATH,
     MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET,
 )
-from schemas import (
+from app.schemas import (
     MaintenanceInput, ClassificationResponse,
     ClassifyFailureResponse, ClassifyJsonRequest,
     TrainResponse, HealthResponse
 )
-from models.preprocessor import MaintenancePreprocessor
-from models.model import MaintenanceClassifier
+from app.models.preprocessor import MaintenancePreprocessor
+from app.models.model import MaintenanceClassifier
 
 app = FastAPI(
     title=SERVICE_NAME,

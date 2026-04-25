@@ -3,15 +3,44 @@ import { useNavigate, useParams } from 'react-router-dom'
 import useAuthStore from '../../store/auth.store'
 import api from '../../api/axios'
 
+<<<<<<< HEAD
+=======
+/**
+ * ClaimReview (Investigator)
+ *
+ * FIX 1 — Payload to PATCH /claims/:id/decide must be { outcome, notes }
+ *          not { decision, note }.
+ *
+ * FIX 2 — `claim.client` has `firstName` + `lastName`, not `fullName`.
+ *          All client name references updated.
+ *
+ * FIX 3 — `claim.equipment` is an object {name, type}, not a string.
+ *
+ * FIX 4 — AI scores live in `claim.analysis.*`, not directly on claim.
+ *
+ * FIX 5 — `claim.claimedAmount` not `claim.amount`.
+ */
+
+>>>>>>> a259412 (frontend v2 not completed)
 function Sidebar({ active }) {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
   const items = [
+<<<<<<< HEAD
     { key: 'dashboard', label: 'Tableau de bord',    icon: '▦' },
     { key: 'flagged',   label: 'Dossiers a traiter', icon: '⚑' },
     { key: 'history',   label: 'Historique',         icon: '≡' },
     { key: 'stats',     label: 'Statistiques',       icon: '◑' },
   ]
+=======
+    { key: 'dashboard', label: 'Tableau de bord', icon: '▦' },
+    { key: 'flagged', label: 'Dossiers a traiter', icon: '⚑' },
+    { key: 'history', label: 'Historique', icon: '≡' },
+    { key: 'stats', label: 'Statistiques', icon: '◑' },
+  ]
+  // FIX 2 — derive name from firstName/lastName
+  const investigatorName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Investigateur'
+>>>>>>> a259412 (frontend v2 not completed)
   return (
     <div style={{ width: 240, minHeight: '100vh', backgroundColor: '#0F2347', display: 'flex', flexDirection: 'column', position: 'fixed', left: 0, top: 0, zIndex: 100 }}>
       <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -24,8 +53,13 @@ function Sidebar({ active }) {
         </div>
       </div>
       <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+<<<<<<< HEAD
         <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, marginBottom: '0.5rem' }}>{user?.fullName?.[0] || 'I'}</div>
         <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{user?.fullName || 'Investigateur'}</div>
+=======
+        <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, marginBottom: '0.5rem' }}>{user?.firstName?.[0] || 'I'}</div>
+        <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{investigatorName}</div>
+>>>>>>> a259412 (frontend v2 not completed)
         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Investigateur senior</div>
       </div>
       <nav style={{ flex: 1, padding: '1rem 0' }}>
@@ -77,19 +111,31 @@ export default function ClaimReview() {
   const [claim, setClaim] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+<<<<<<< HEAD
   const [decision, setDecision] = useState('')
   const [comment, setComment] = useState('')
+=======
+  // FIX 1 — renamed to match backend field names
+  const [outcome, setOutcome] = useState('')  // 'APPROVED' | 'REJECTED'
+  const [notes, setNotes] = useState('')
+>>>>>>> a259412 (frontend v2 not completed)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
     api.get(`/claims/${id}`)
+<<<<<<< HEAD
       .then(res => setClaim(res.data))
       .catch(err => setError('Dossier introuvable'))
+=======
+      .then(res => setClaim(res.data?.data || res.data))
+      .catch(() => setError('Dossier introuvable'))
+>>>>>>> a259412 (frontend v2 not completed)
       .finally(() => setLoading(false))
   }, [id])
 
   const handleDecision = async () => {
+<<<<<<< HEAD
     if (!decision || !comment.trim()) return
     setSubmitting(true)
     try {
@@ -97,6 +143,13 @@ export default function ClaimReview() {
         decision,
         note: comment
       })
+=======
+    if (!outcome || !notes.trim()) return
+    setSubmitting(true)
+    try {
+      // FIX 1 — correct field names
+      await api.patch(`/claims/${id}/decide`, { outcome, notes })
+>>>>>>> a259412 (frontend v2 not completed)
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.message || 'Erreur lors de la soumission')
@@ -127,11 +180,33 @@ export default function ClaimReview() {
     </div>
   )
 
+<<<<<<< HEAD
+=======
+  // FIX 2 — client name from firstName + lastName
+  const clientName = `${claim.client?.firstName || ''} ${claim.client?.lastName || ''}`.trim() || 'Client'
+  // FIX 3 — equipment is object
+  const equipmentName = claim.equipment?.name || '-'
+  // FIX 4 — scores from analysis
+  const analysis = claim.analysis || {}
+  const finalScore = analysis.finalScore ?? 50
+  const anomalyScore = analysis.anomalyScore ?? 50
+  const classificationScore = analysis.classificationScore ?? 50
+  const nlpScore = analysis.nlpScore ?? 50
+  const visionScore = analysis.visionScore ?? 50
+  // FIX 5 — claimedAmount
+  const claimedAmount = claim.claimedAmount
+
+  const score = Math.round(finalScore)
+  // FIX 2 — investigator name
+  const investigatorName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Investigateur'
+
+>>>>>>> a259412 (frontend v2 not completed)
   if (done) return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
       <Sidebar active="flagged" />
       <div style={{ marginLeft: 240, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', backgroundColor: 'white', borderRadius: 16, padding: '3rem', border: '1px solid #EEF0F6', maxWidth: 480 }}>
+<<<<<<< HEAD
           <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: decision === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', border: `2px solid ${decision === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.5rem' }}>
             {decision === 'APPROVED' ? '✓' : '✕'}
           </div>
@@ -146,6 +221,22 @@ export default function ClaimReview() {
           </p>
           <div style={{ backgroundColor: '#F7F8FC', borderRadius: 8, padding: '0.75rem', marginBottom: '2rem', fontSize: '0.8rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
             Decision enregistree par <strong style={{ color: '#0F2347' }}>{user?.fullName}</strong> — {new Date().toLocaleString('fr-FR')}
+=======
+          <div style={{ width: 64, height: 64, borderRadius: '50%', backgroundColor: outcome === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', border: `2px solid ${outcome === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.5rem' }}>
+            {outcome === 'APPROVED' ? '✓' : '✕'}
+          </div>
+          <h2 style={{ color: '#0F2347', fontSize: '1.4rem', fontWeight: 400, marginBottom: '0.5rem' }}>
+            Dossier <strong>{outcome === 'APPROVED' ? 'Approuve' : 'Rejete'}</strong>
+          </h2>
+          <p style={{ color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '0.88rem', marginBottom: '0.5rem' }}>
+            {claim.reference} — {clientName}
+          </p>
+          <p style={{ color: '#6B7280', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '0.85rem', marginBottom: '2rem', fontStyle: 'italic' }}>
+            "{notes}"
+          </p>
+          <div style={{ backgroundColor: '#F7F8FC', borderRadius: 8, padding: '0.75rem', marginBottom: '2rem', fontSize: '0.8rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+            Decision enregistree par <strong style={{ color: '#0F2347' }}>{investigatorName}</strong> — {new Date().toLocaleString('fr-FR')}
+>>>>>>> a259412 (frontend v2 not completed)
           </div>
           <button onClick={() => navigate('/investigator/dashboard')}
             style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
@@ -156,14 +247,20 @@ export default function ClaimReview() {
     </div>
   )
 
+<<<<<<< HEAD
   const score = Math.round(claim.finalScore || 50)
 
+=======
+>>>>>>> a259412 (frontend v2 not completed)
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
       <Sidebar active="flagged" />
       <div style={{ marginLeft: 240, flex: 1, padding: '2rem' }}>
 
+<<<<<<< HEAD
         {/* Header */}
+=======
+>>>>>>> a259412 (frontend v2 not completed)
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
           <div>
             <button onClick={() => navigate('/investigator/dashboard')}
@@ -173,8 +270,14 @@ export default function ClaimReview() {
             <h1 style={{ fontSize: '1.75rem', color: '#0F2347', fontWeight: 400 }}>
               Revision dossier <strong>{claim.reference}</strong>
             </h1>
+<<<<<<< HEAD
             <p style={{ color: '#9CA3AF', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
               {claim.client?.fullName} — {claim.equipment}
+=======
+            {/* FIX 2+3 */}
+            <p style={{ color: '#9CA3AF', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
+              {clientName} — {equipmentName}
+>>>>>>> a259412 (frontend v2 not completed)
             </p>
           </div>
           <div style={{ backgroundColor: '#FEF9E7', border: '1px solid #F7DC6F', borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.82rem', color: '#7D6608', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600 }}>
@@ -189,20 +292,34 @@ export default function ClaimReview() {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem' }}>
+<<<<<<< HEAD
 
           {/* Gauche */}
           <div>
             {/* Infos */}
+=======
+          {/* Left */}
+          <div>
+>>>>>>> a259412 (frontend v2 not completed)
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Informations du dossier</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 {[
+<<<<<<< HEAD
                   ['Client',          claim.client?.fullName || '-'],
                   ['Montant reclame', `${claim.amount?.toLocaleString('fr-FR')} DA`],
                   ['Equipement',      claim.equipment],
                   ['Date incident',   new Date(claim.incidentDate).toLocaleDateString('fr-FR')],
                   ['Lieu',            claim.location || 'Non specifie'],
                   ['Indicateur IA',   claim.fraudIndicator || 'UNKNOWN'],
+=======
+                  /* FIX 2 */['Client', clientName],
+                  /* FIX 5 */['Montant reclame', claimedAmount ? `${claimedAmount.toLocaleString('fr-FR')} DA` : '-'],
+                  /* FIX 3 */['Equipement', equipmentName],
+                  ['Date incident', new Date(claim.incidentDate).toLocaleDateString('fr-FR')],
+                  ['Lieu', claim.location || 'Non specifie'],
+                  /* FIX 4 */['Classe fraude', analysis.fraudClass || 'N/A'],
+>>>>>>> a259412 (frontend v2 not completed)
                 ].map(([k, v]) => (
                   <div key={k}>
                     <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.2rem' }}>{k}</div>
@@ -216,6 +333,7 @@ export default function ClaimReview() {
               </div>
             </div>
 
+<<<<<<< HEAD
             {/* Scores IA */}
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Detail des 4 modeles IA</h2>
@@ -226,6 +344,18 @@ export default function ClaimReview() {
                 ['Modele 4 — Vision photos (20%)',      claim.visionScore],
               ].map(([title, sc]) => {
                 const s = Math.round(sc || 50)
+=======
+            {/* AI Scores — FIX 4 */}
+            <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Detail des 4 modeles IA</h2>
+              {[
+                ['Modele 1 — Anomalie capteurs (35%)', anomalyScore],
+                ['Modele 2 — Classification (25%)', classificationScore],
+                ['Modele 3 — Analyse NLP (20%)', nlpScore],
+                ['Modele 4 — Vision photos (20%)', visionScore],
+              ].map(([title, sc]) => {
+                const s = Math.round(sc)
+>>>>>>> a259412 (frontend v2 not completed)
                 const color = s > 70 ? '#C0392B' : s > 30 ? '#F39C12' : '#1A7A4A'
                 return (
                   <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', padding: '0.85rem', border: '1px solid #EEF0F6', borderRadius: 8, marginBottom: '0.6rem' }}>
@@ -254,9 +384,14 @@ export default function ClaimReview() {
             </div>
           </div>
 
+<<<<<<< HEAD
           {/* Droite */}
           <div>
             {/* Score */}
+=======
+          {/* Right */}
+          <div>
+>>>>>>> a259412 (frontend v2 not completed)
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem', textAlign: 'center' }}>Score IA</h2>
               <ScoreGauge score={score} />
@@ -264,6 +399,7 @@ export default function ClaimReview() {
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#7D6608', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>ZONE GRISE</div>
                 <div style={{ fontSize: '0.72rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>Revision humaine obligatoire</div>
               </div>
+<<<<<<< HEAD
               {claim.fraudIndicator && (
                 <div style={{ marginTop: '0.75rem', padding: '0.65rem', backgroundColor: '#F7F8FC', borderRadius: 8, textAlign: 'center' }}>
                   <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{claim.fraudIndicator}</div>
@@ -273,6 +409,11 @@ export default function ClaimReview() {
             </div>
 
             {/* Decision */}
+=======
+            </div>
+
+            {/* Decision panel — FIX 1 */}
+>>>>>>> a259412 (frontend v2 not completed)
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', position: 'sticky', top: '2rem' }}>
               <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Votre decision</h2>
               <p style={{ color: '#9CA3AF', fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.25rem' }}>
@@ -282,18 +423,28 @@ export default function ClaimReview() {
               <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 {[
                   { key: 'APPROVED', icon: '✓', label: 'Approuver', desc: 'Sinistre legitime', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA' },
+<<<<<<< HEAD
                   { key: 'REJECTED', icon: '✕', label: 'Rejeter',   desc: 'Fraude probable',  color: '#C0392B', bg: '#FDF2F2', border: '#EBCECE' },
                 ].map(r => (
                   <div key={r.key} onClick={() => setDecision(r.key)}
                     style={{ flex: 1, padding: '1rem', border: `2px solid ${decision === r.key ? r.color : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', textAlign: 'center', backgroundColor: decision === r.key ? r.bg : '#F9FAFB', transition: 'all 0.2s' }}>
                     <div style={{ fontSize: '1.4rem', marginBottom: '0.3rem', color: decision === r.key ? r.color : '#9CA3AF' }}>{r.icon}</div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 600, color: decision === r.key ? r.color : '#6B7280', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{r.label}</div>
+=======
+                  { key: 'REJECTED', icon: '✕', label: 'Rejeter', desc: 'Fraude probable', color: '#C0392B', bg: '#FDF2F2', border: '#EBCECE' },
+                ].map(r => (
+                  <div key={r.key} onClick={() => setOutcome(r.key)}
+                    style={{ flex: 1, padding: '1rem', border: `2px solid ${outcome === r.key ? r.color : '#E5E7EB'}`, borderRadius: 10, cursor: 'pointer', textAlign: 'center', backgroundColor: outcome === r.key ? r.bg : '#F9FAFB', transition: 'all 0.2s' }}>
+                    <div style={{ fontSize: '1.4rem', marginBottom: '0.3rem', color: outcome === r.key ? r.color : '#9CA3AF' }}>{r.icon}</div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600, color: outcome === r.key ? r.color : '#6B7280', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{r.label}</div>
+>>>>>>> a259412 (frontend v2 not completed)
                     <div style={{ fontSize: '0.7rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>{r.desc}</div>
                   </div>
                 ))}
               </div>
 
               <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#4B5563', marginBottom: '0.4rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+<<<<<<< HEAD
                 Commentaire obligatoire
               </label>
               <textarea rows={4} placeholder="Justifiez votre decision en detail..."
@@ -313,6 +464,36 @@ export default function ClaimReview() {
                   : !decision ? 'Choisissez une decision'
                   : decision === 'APPROVED' ? 'Confirmer — Approuver'
                   : 'Confirmer — Rejeter'}
+=======
+                Commentaire obligatoire (min. 10 caracteres)
+              </label>
+              <textarea rows={4} placeholder="Justifiez votre decision en detail..."
+                value={notes} onChange={e => setNotes(e.target.value)}
+                style={{ width: '100%', padding: '0.72rem', border: `1.5px solid ${!notes && outcome ? '#C0392B' : '#E5E7EB'}`, borderRadius: 6, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', outline: 'none', backgroundColor: '#F9FAFB', boxSizing: 'border-box', resize: 'vertical' }} />
+
+              <button onClick={handleDecision}
+                disabled={!outcome || notes.trim().length < 10 || submitting}
+                style={{
+                  width: '100%', marginTop: '1rem', padding: '0.85rem',
+                  background: !outcome || notes.trim().length < 10
+                    ? '#E5E7EB'
+                    : outcome === 'APPROVED'
+                      ? 'linear-gradient(135deg, #1A7A4A, #27AE60)'
+                      : 'linear-gradient(135deg, #C0392B, #E74C3C)',
+                  color: !outcome || notes.trim().length < 10 ? '#9CA3AF' : 'white',
+                  border: 'none', borderRadius: 8, fontSize: '0.86rem',
+                  fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600,
+                  cursor: !outcome || notes.trim().length < 10 || submitting ? 'not-allowed' : 'pointer',
+                  letterSpacing: '0.05em', textTransform: 'uppercase',
+                }}>
+                {submitting
+                  ? 'Enregistrement...'
+                  : !outcome
+                    ? 'Choisissez une decision'
+                    : outcome === 'APPROVED'
+                      ? 'Confirmer — Approuver'
+                      : 'Confirmer — Rejeter'}
+>>>>>>> a259412 (frontend v2 not completed)
               </button>
 
               <p style={{ fontSize: '0.72rem', color: '#9CA3AF', textAlign: 'center', marginTop: '0.75rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>

@@ -59,6 +59,10 @@ coverage.xml
 node_modules/
 dist/
 .npm
+<<<<<<< HEAD
+=======
+
+>>>>>>> a259412 (frontend v2 not completed)
 # ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
 
