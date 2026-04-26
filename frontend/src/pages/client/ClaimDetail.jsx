@@ -2,109 +2,62 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import useAuthStore from '../../store/auth.store'
 import api from '../../api/axios'
-import { exportClaimPDF } from '../../utils/pdfExport'
 
 /**
  * ClaimDetail
  *
- * FIX 1 — All AI scores are nested under `claim.analysis`:
- *          claim.analysis?.finalScore, claim.analysis?.anomalyScore, etc.
+ * GET /claims/:id  →  { success, data: Claim }
  *
- * FIX 2 — Decision data lives in `claim.decision`:
- *          claim.decision?.notes, claim.decision?.outcome, claim.decision?.decidedAt,
- *          claim.decision?.investigator (object with firstName/lastName).
- *
- * FIX 3 — `claim.equipment` is an object {name, type, ...}, not a string.
- *
- * FIX 4 — `claim.claimedAmount` not `claim.amount`.
- *
- * FIX 5 — `fraudIndicator` / `preIncidentAnomaly` don't exist in the backend
- *          schema. Removed references; score thresholds used instead.
+ * Claim shape (from claims.service.ts findOne):
+ *   claim.equipment          object { id, name, type, ... }
+ *   claim.client             object { id, firstName, lastName, ... }
+ *   claim.files              ClaimFile[]
+ *   claim.analysis           AIAnalysis | null
+ *     .finalScore            number
+ *     .anomalyScore          number
+ *     .classificationScore   number
+ *     .nlpScore              number
+ *     .visionScore           number
+ *     .fraudClass            string
+ *   claim.decision           Decision | null
+ *     .outcome               APPROVED | REJECTED
+ *     .notes                 string
+ *     .type                  AUTO | HUMAN
+ *     .createdAt             string
+ *     .investigator          { firstName, lastName, email } | null
+ *   claim.claimedAmount      number  (never "amount")
+ *   claim.pdfUrl             string | null
  */
 
 const STATUS_CONFIG = {
-  APPROVED: { label: 'Approuve', bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA' },
-  REJECTED: { label: 'Rejete', bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE' },
+  APPROVED: { label: 'Approuvé', bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA' },
+  REJECTED: { label: 'Rejeté', bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE' },
   PENDING: { label: 'En attente', bg: '#FEF9E7', color: '#7D6608', border: '#F7DC6F' },
   ANALYZING: { label: 'Analyse en cours', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
-  HUMAN_REVIEW: { label: 'Revision humaine', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
-}
-
-function Sidebar({ active }) {
-  const navigate = useNavigate()
-  const { logout, user } = useAuthStore()
-  const items = [
-    { key: 'dashboard', label: 'Tableau de bord', icon: '▦' },
-    { key: 'new-claim', label: 'Nouveau sinistre', icon: '+' },
-    { key: 'claims', label: 'Mes sinistres', icon: '≡' },
-    { key: 'profile', label: 'Mon profil', icon: '👤' },
-  ]
-  return (
-    <div style={{ width: 240, minHeight: '100vh', backgroundColor: '#0F2347', display: 'flex', flexDirection: 'column', position: 'fixed', left: 0, top: 0, zIndex: 100 }}>
-      <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#0F2347' }}>F</div>
-          <div>
-            <div style={{ color: 'white', fontWeight: 700, fontSize: '0.95rem' }}>FraudGuard AI</div>
-            <div style={{ color: '#C9A84C', fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Espace Client</div>
-          </div>
-        </div>
-      </div>
-      <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, marginBottom: '0.5rem' }}>
-          {user?.firstName?.[0] || 'U'}
-        </div>
-        <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>
-          {`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Utilisateur'}
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{user?.company || 'Client'}</div>
-      </div>
-      <nav style={{ flex: 1, padding: '1rem 0' }}>
-        {items.map(item => (
-          <div key={item.key}
-            onClick={() => {
-              if (item.key === 'new-claim') navigate('/client/new-claim')
-              if (item.key === 'dashboard') navigate('/client/dashboard')
-              if (item.key === 'claims') navigate('/client/claims')
-              if (item.key === 'profile') navigate('/client/profile')
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1.5rem', cursor: 'pointer', backgroundColor: active === item.key ? 'rgba(201,168,76,0.15)' : 'transparent', borderLeft: active === item.key ? '3px solid #C9A84C' : '3px solid transparent' }}>
-            <span style={{ color: active === item.key ? '#C9A84C' : 'rgba(255,255,255,0.5)', width: 20, textAlign: 'center' }}>{item.icon}</span>
-            <span style={{ color: active === item.key ? 'white' : 'rgba(255,255,255,0.55)', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: active === item.key ? 600 : 400 }}>{item.label}</span>
-          </div>
-        ))}
-      </nav>
-      <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div onClick={() => { logout(); window.location.href = '/login' }} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
-          <span style={{ color: 'rgba(255,255,255,0.4)' }}>↩</span>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Deconnexion</span>
-        </div>
-      </div>
-    </div>
-  )
+  HUMAN_REVIEW: { label: 'Révision humaine', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1' },
 }
 
 function ScoreGauge({ score }) {
   const color = score > 70 ? '#C0392B' : score > 30 ? '#F39C12' : '#1A7A4A'
-  const circumference = 2 * Math.PI * 54
-  const offset = circumference - (score / 100) * circumference
+  const circ = 2 * Math.PI * 54
+  const offset = circ - (score / 100) * circ
   return (
     <div style={{ textAlign: 'center', padding: '1.5rem' }}>
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <svg width={140} height={140} viewBox="0 0 140 140">
           <circle cx={70} cy={70} r={54} fill="none" stroke="#F3F4F6" strokeWidth={10} />
           <circle cx={70} cy={70} r={54} fill="none" stroke={color} strokeWidth={10}
-            strokeDasharray={circumference} strokeDashoffset={offset}
+            strokeDasharray={circ} strokeDashoffset={offset}
             strokeLinecap="round" transform="rotate(-90 70 70)" />
         </svg>
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
           <div style={{ fontSize: '2rem', fontWeight: 700, color, fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{score}</div>
           <div style={{ fontSize: '0.65rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>/100</div>
         </div>
       </div>
       <div style={{ marginTop: '0.75rem' }}>
         <div style={{ fontSize: '0.88rem', fontWeight: 600, color, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-          {score > 70 ? 'Fraude tres probable' : score > 30 ? 'Zone grise' : 'Sinistre credible'}
+          {score > 70 ? 'Fraude très probable' : score > 30 ? 'Zone grise' : 'Sinistre crédible'}
         </div>
         <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>Score global de fraude</div>
       </div>
@@ -113,8 +66,9 @@ function ScoreGauge({ score }) {
 }
 
 function AIModelCard({ title, score, weight }) {
-  const color = score > 70 ? '#C0392B' : score > 30 ? '#F39C12' : '#1A7A4A'
-  const label = score > 70 ? 'Score eleve — suspect' : score > 30 ? 'Zone grise' : 'Score normal'
+  const s = Math.round(score)
+  const color = s > 70 ? '#C0392B' : s > 30 ? '#F39C12' : '#1A7A4A'
+  const label = s > 70 ? 'Score élevé — suspect' : s > 30 ? 'Zone grise' : 'Score normal'
   return (
     <div style={{ backgroundColor: 'white', border: '1px solid #EEF0F6', borderRadius: 10, padding: '1rem', marginBottom: '0.75rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
@@ -123,12 +77,12 @@ function AIModelCard({ title, score, weight }) {
           <div style={{ fontSize: '0.72rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Poids : {weight}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700, color, fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{Math.round(score)}</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 700, color, fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{s}</div>
           <div style={{ fontSize: '0.65rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>/100</div>
         </div>
       </div>
       <div style={{ height: 6, backgroundColor: '#F3F4F6', borderRadius: 3, overflow: 'hidden', marginBottom: '0.5rem' }}>
-        <div style={{ height: '100%', width: `${score}%`, backgroundColor: color, borderRadius: 3 }} />
+        <div style={{ height: '100%', width: `${s}%`, backgroundColor: color, borderRadius: 3 }} />
       </div>
       <div style={{ fontSize: '0.78rem', fontWeight: 600, color, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{label}</div>
     </div>
@@ -142,69 +96,52 @@ export default function ClaimDetail() {
   const [claim, setClaim] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [exporting, setExporting] = useState(false)
 
-  useEffect(() => {
+  const fetchClaim = () =>
     api.get(`/claims/${id}`)
-      .then(res => setClaim(res.data?.data || res.data))
+      .then(res => {
+        // TransformInterceptor → { success, data: Claim }
+        const data = res.data?.data ?? res.data
+        setClaim(data)
+      })
       .catch(err => {
         if (err.response?.status === 404) setError('Sinistre introuvable')
         else setError('Erreur lors du chargement')
       })
       .finally(() => setLoading(false))
-  }, [id])
+
+  useEffect(() => { fetchClaim() }, [id])
 
   // Poll while still processing
   useEffect(() => {
     if (!claim) return
-    if (claim.status !== 'ANALYZING' && claim.status !== 'PENDING') return
-    const interval = setInterval(() => {
-      api.get(`/claims/${id}`)
-        .then(res => setClaim(res.data?.data || res.data))
-        .catch(() => { })
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [claim, id])
+    if (!['ANALYZING', 'PENDING'].includes(claim.status)) return
+    const id_interval = setInterval(fetchClaim, 5000)
+    return () => clearInterval(id_interval)
+  }, [claim?.status])
 
-  const handleExportPDF = async () => {
-    setExporting(true)
-    try {
-      exportClaimPDF(claim, user)
-    } catch (err) {
-      console.error('Erreur export PDF:', err)
-    } finally {
-      setExporting(false)
-    }
-  }
-
+  // ── Loading / Error ──────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
-      <Sidebar active="claims" />
-      <div style={{ marginLeft: 240, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Chargement...</div>
-      </div>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', alignItems: 'center', justifyContent: 'center', fontFamily: 'Helvetica Neue, Arial, sans-serif', color: '#9CA3AF' }}>
+      Chargement...
     </div>
   )
 
   if (error || !claim) return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
-      <Sidebar active="claims" />
-      <div style={{ marginLeft: 240, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>404</div>
-          <div style={{ color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>{error || 'Sinistre introuvable'}</div>
-          <button onClick={() => navigate('/client/dashboard')}
-            style={{ padding: '0.6rem 1.2rem', background: '#0F2347', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-            Retour
-          </button>
-        </div>
-      </div>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{ fontSize: '3rem' }}>404</div>
+      <div style={{ color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{error || 'Sinistre introuvable'}</div>
+      <button onClick={() => navigate('/client/claims')}
+        style={{ padding: '0.6rem 1.2rem', background: '#0F2347', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+        Retour
+      </button>
     </div>
   )
 
+  // ── Data extraction ──────────────────────────────────────────────────────
   const sc = STATUS_CONFIG[claim.status] || STATUS_CONFIG['PENDING']
 
-  // FIX 1 — all AI data is nested inside claim.analysis
+  // analysis is a nested object, NOT top-level fields
   const analysis = claim.analysis || null
   const finalScore = analysis?.finalScore ?? null
   const anomalyScore = analysis?.anomalyScore ?? null
@@ -213,75 +150,76 @@ export default function ClaimDetail() {
   const visionScore = analysis?.visionScore ?? null
   const fraudClass = analysis?.fraudClass ?? null
 
-  // FIX 2 — decision nested under claim.decision
+  // decision nested object
   const decision = claim.decision || null
   const investigatorNotes = decision?.notes ?? null
   const decidedAt = decision?.createdAt ?? null
-  const investigatorName = decision
-    ? `${decision.investigator?.firstName || ''} ${decision.investigator?.lastName || ''}`.trim()
-    : null
+  const investigatorName = decision?.investigator
+    ? `${decision.investigator.firstName || ''} ${decision.investigator.lastName || ''}`.trim()
+    : decision?.type === 'AUTO' ? 'Système IA (automatique)' : null
 
-  // FIX 3 — equipment is object
-  const equipmentName = claim.equipment?.name || '-'
-  const equipmentType = claim.equipment?.type || '-'
-
-  // FIX 4 — claimedAmount
-  const claimedAmount = claim.claimedAmount
+  // equipment is an object
+  const equipmentName = claim.equipment?.name || '—'
+  const equipmentType = claim.equipment?.type || '—'
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
-      <Sidebar active="claims" />
-      <div style={{ marginLeft: 240, flex: 1, padding: '2rem' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F7F8FC', fontFamily: 'Georgia, serif' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem' }}>
 
+        {/* ── Page header ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
           <div>
-            <button onClick={() => navigate('/client/dashboard')}
+            <button onClick={() => navigate('/client/claims')}
               style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.82rem', cursor: 'pointer', fontFamily: 'Helvetica Neue, Arial, sans-serif', padding: 0, marginBottom: '0.5rem' }}>
-              ← Retour au dashboard
+              ← Retour aux sinistres
             </button>
             <h1 style={{ fontSize: '1.75rem', color: '#0F2347', fontWeight: 400 }}>
               Sinistre <strong>{claim.reference}</strong>
             </h1>
-            {/* FIX 3 */}
             <p style={{ color: '#9CA3AF', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
               {equipmentName} — {new Date(claim.incidentDate).toLocaleDateString('fr-FR')}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <button onClick={handleExportPDF} disabled={exporting}
-              style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F2347', border: 'none', borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 700, cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: exporting ? 0.7 : 1, boxShadow: '0 2px 8px rgba(201,168,76,0.3)', transition: 'transform 0.15s' }}
-              onMouseEnter={e => { if (!exporting) e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-              📄 {exporting ? 'Export...' : 'Exporter PDF'}
-            </button>
+            {claim.pdfUrl && (
+              <a href={claim.pdfUrl} target="_blank" rel="noreferrer"
+                style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0F2347', border: 'none', borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 700, cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                📄 Lettre de décision
+              </a>
+            )}
             <span style={{ padding: '0.4rem 1rem', borderRadius: 20, fontSize: '0.82rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
               {sc.label}
             </span>
           </div>
         </div>
 
-        {(claim.status === 'ANALYZING' || claim.status === 'PENDING') && (
+        {/* Analyzing banner */}
+        {['ANALYZING', 'PENDING'].includes(claim.status) && (
           <div style={{ backgroundColor: '#EBF5FB', border: '1px solid #AED6F1', borderRadius: 10, padding: '1rem 1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ fontSize: '1.5rem' }}>⏳</div>
             <div>
               <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1A5276', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Analyse IA en cours...</div>
-              <div style={{ fontSize: '0.8rem', color: '#5D9CEC', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Cette page se rafraichit automatiquement toutes les 5 secondes</div>
+              <div style={{ fontSize: '0.8rem', color: '#5D9CEC', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Cette page se rafraîchit automatiquement toutes les 5 secondes</div>
             </div>
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
+
+          {/* ── Left column ── */}
           <div>
-            {/* Claim info */}
+
+            {/* Claim info card */}
             <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
               <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Informations du sinistre</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 {[
-                  ['Equipement', equipmentName],
+                  ['Équipement', equipmentName],
                   ['Type', equipmentType],
-                  /* FIX 4 */
-                  ['Montant reclame', claimedAmount ? `${claimedAmount.toLocaleString('fr-FR')} DA` : '-'],
+                  ['Montant réclamé', claim.claimedAmount != null ? `${claim.claimedAmount.toLocaleString('fr-FR')} DA` : '—'],
                   ['Date incident', new Date(claim.incidentDate).toLocaleDateString('fr-FR')],
+                  ['Date soumission', new Date(claim.createdAt).toLocaleDateString('fr-FR')],
+                  ['Référence', claim.reference],
                 ].map(([k, v]) => (
                   <div key={k}>
                     <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.2rem' }}>{k}</div>
@@ -295,16 +233,41 @@ export default function ClaimDetail() {
               </div>
             </div>
 
-            {/* AI analysis — FIX 1 */}
-            {finalScore !== null && (
+            {/* Files */}
+            {claim.files?.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Analyse par les 4 modeles IA</h2>
-                {anomalyScore !== null && <AIModelCard title="Modele 1 — Anomalie capteurs" score={anomalyScore} weight="35%" />}
-                {classificationScore !== null && <AIModelCard title="Modele 2 — Classification panne" score={classificationScore} weight="25%" />}
-                {nlpScore !== null && <AIModelCard title="Modele 3 — Analyse rapport NLP" score={nlpScore} weight="20%" />}
-                {visionScore !== null && <AIModelCard title="Modele 4 — Verification photos" score={visionScore} weight="20%" />}
+                <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>
+                  Fichiers joints ({claim.files.length})
+                </h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {claim.files.map(f => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.9rem', backgroundColor: '#F9FAFB', borderRadius: 8, border: '1px solid #EEF0F6' }}>
+                      <span style={{ fontSize: '1rem' }}>{f.fileType === 'CSV' ? '📊' : f.fileType === 'PHOTO' ? '🖼' : '📄'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{f.fileName}</div>
+                        <div style={{ fontSize: '0.68rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+                          {f.fileType} — {f.fileSize ? `${(f.fileSize / 1024).toFixed(1)} KB` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI Analysis — only when analysis exists */}
+            {analysis && finalScore != null && (
+              <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>
+                  Analyse par les 4 modèles IA
+                </h2>
+                {anomalyScore != null && <AIModelCard title="Modèle 1 — Anomalie capteurs" score={anomalyScore} weight="35%" />}
+                {classificationScore != null && <AIModelCard title="Modèle 2 — Classification panne" score={classificationScore} weight="25%" />}
+                {nlpScore != null && <AIModelCard title="Modèle 3 — Analyse rapport NLP" score={nlpScore} weight="20%" />}
+                {visionScore != null && <AIModelCard title="Modèle 4 — Vérification photos" score={visionScore} weight="20%" />}
+
                 <div style={{ backgroundColor: '#F7F8FC', border: '1px solid #EEF0F6', borderRadius: 8, padding: '0.75rem 1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Score final combine</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Score final combiné</span>
                   <span style={{ fontSize: '1.2rem', fontWeight: 700, color: finalScore > 70 ? '#C0392B' : finalScore > 30 ? '#F39C12' : '#1A7A4A', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                     {Math.round(finalScore)} / 100
                   </span>
@@ -317,28 +280,46 @@ export default function ClaimDetail() {
               </div>
             )}
 
-            {/* Decision — FIX 2 */}
-            {investigatorNotes && (
+            {/* Decision */}
+            {decision && (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem' }}>
                 <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.75rem' }}>
-                  Decision de l'investigateur
-                  {investigatorName && <span style={{ fontWeight: 400, color: '#9CA3AF', fontSize: '0.82rem', marginLeft: '0.5rem' }}>— {investigatorName}</span>}
+                  Décision finale
+                  {investigatorName && (
+                    <span style={{ fontWeight: 400, color: '#9CA3AF', fontSize: '0.82rem', marginLeft: '0.5rem' }}>
+                      — {investigatorName}
+                    </span>
+                  )}
                 </h2>
-                <div style={{ backgroundColor: claim.status === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', border: `1px solid ${claim.status === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}`, borderRadius: 8, padding: '0.75rem 1rem', fontSize: '0.88rem', color: claim.status === 'APPROVED' ? '#1A7A4A' : '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontStyle: 'italic' }}>
-                  "{investigatorNotes}"
+
+                {/* Outcome badge */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <span style={{ padding: '0.3rem 0.8rem', borderRadius: 20, fontSize: '0.78rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: decision.outcome === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', color: decision.outcome === 'APPROVED' ? '#1A7A4A' : '#C0392B', border: `1px solid ${decision.outcome === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}` }}>
+                    {decision.outcome === 'APPROVED' ? '✓ Approuvé' : '✕ Rejeté'}
+                    {decision.type === 'AUTO' ? ' (automatique)' : ' (humain)'}
+                  </span>
                 </div>
+
+                {investigatorNotes && (
+                  <div style={{ backgroundColor: decision.outcome === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', border: `1px solid ${decision.outcome === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}`, borderRadius: 8, padding: '0.75rem 1rem', fontSize: '0.88rem', color: decision.outcome === 'APPROVED' ? '#1A7A4A' : '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontStyle: 'italic' }}>
+                    "{investigatorNotes}"
+                  </div>
+                )}
+
                 {decidedAt && (
                   <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.5rem' }}>
-                    Decision prise le {new Date(decidedAt).toLocaleString('fr-FR')}
+                    Décision prise le {new Date(decidedAt).toLocaleString('fr-FR')}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Right column — score gauge */}
+          {/* ── Right column ── */}
           <div>
-            {finalScore !== null ? (
+
+            {/* Score gauge */}
+            {finalScore != null ? (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', marginBottom: '1.5rem' }}>
                 <ScoreGauge score={Math.round(finalScore)} />
               </div>
@@ -356,9 +337,9 @@ export default function ClaimDetail() {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {[
                   { label: 'Sinistre soumis', date: claim.createdAt, done: true },
-                  { label: 'Analyse IA lancee', date: claim.createdAt, done: true },
-                  { label: 'Analyse terminee', date: claim.updatedAt, done: finalScore !== null },
-                  { label: 'Decision finale', date: decidedAt, done: !!decidedAt },
+                  { label: 'Analyse IA lancée', date: claim.createdAt, done: true },
+                  { label: 'Analyse terminée', date: claim.updatedAt, done: finalScore != null },
+                  { label: 'Décision finale', date: decidedAt, done: !!decidedAt },
                 ].map((t, i, arr) => (
                   <div key={i} style={{ display: 'flex', gap: '0.75rem', paddingBottom: i < arr.length - 1 ? '1rem' : 0 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
