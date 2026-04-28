@@ -6,16 +6,13 @@ import api from '../../api/axios'
 /**
  * ProfilePage (Client)
  *
- * FIX 1 — removed `token` and `role` destructure from store (role doesn't exist
- *          as a standalone field). `setAuth` is now called with the correct
- *          signature: setAuth(updatedUser, currentAccessToken).
- *          The store keeps the existing refreshToken automatically.
- *
- * FIX 2 — profile fields use `firstName` / `lastName` matching the backend
- *          User model, not a `fullName` string.
+ * FIXED: setAuth(updatedUser, accessToken, refreshToken) — all 3 args.
+ * Without the 3rd arg, Zustand sets refreshToken = undefined and the
+ * next token refresh will immediately log the user out.
  */
 export default function ProfilePage() {
-  const { user, setAuth, accessToken } = useAuthStore()
+  // FIXED: also destructure refreshToken so we can pass it back
+  const { user, setAuth, accessToken, refreshToken } = useAuthStore()
   const [dark, toggleDark] = useDarkMode()
   const [activeTab, setActiveTab] = useState('info')
   const [loading, setLoading] = useState(false)
@@ -63,9 +60,10 @@ export default function ProfilePage() {
         company: profileForm.company,
         phone: profileForm.phone,
       })
-      const updatedUser = res.data?.data || res.data
-      // FIX 1 — only 2 args; store keeps existing refreshToken
-      setAuth(updatedUser, accessToken)
+      // TransformInterceptor wraps in { success, data: updatedUser }
+      const updatedUser = res.data?.data ?? res.data
+      // FIXED: pass all 3 args — refreshToken must not become undefined
+      setAuth(updatedUser, accessToken, refreshToken)
       showMsg('success', 'Profil mis a jour avec succes !')
     } catch (err) {
       const msg = err.response?.data?.message
@@ -115,7 +113,6 @@ export default function ProfilePage() {
     fontFamily: 'Helvetica Neue, Arial, sans-serif',
   }
 
-  // FIX 2 — derive display name from firstName / lastName
   const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Utilisateur'
   const initiale = user?.firstName?.[0]?.toUpperCase() || 'U'
 
@@ -151,7 +148,6 @@ export default function ProfilePage() {
               <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, fontSize: '2.2rem', margin: '0 auto 1rem', border: '3px solid #C9A84C' }}>
                 {initiale}
               </div>
-              {/* FIX 2 — derived name */}
               <div style={{ fontSize: '1.1rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.25rem' }}>{fullName}</div>
               <div style={{ fontSize: '0.78rem', color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.25rem' }}>{user?.email}</div>
               <div style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>{user?.company || 'Sans entreprise'}</div>
@@ -252,9 +248,16 @@ export default function ProfilePage() {
                   <div style={{ marginBottom: '1.5rem' }}>
                     <div style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Force du mot de passe</div>
                     <div style={{ height: 6, backgroundColor: dark ? '#1E2D45' : '#F3F4F6', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 3, transition: 'width 0.3s, background 0.3s', width: passwordForm.newPassword.length < 6 ? '25%' : passwordForm.newPassword.length < 10 ? '60%' : '100%', backgroundColor: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A' }} />
+                      <div style={{
+                        height: '100%', borderRadius: 3, transition: 'width 0.3s, background 0.3s',
+                        width: passwordForm.newPassword.length < 6 ? '25%' : passwordForm.newPassword.length < 10 ? '60%' : '100%',
+                        backgroundColor: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A'
+                      }} />
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
+                    <div style={{
+                      fontSize: '0.68rem', marginTop: '0.25rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
+                      color: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A'
+                    }}>
                       {passwordForm.newPassword.length < 6 ? 'Faible' : passwordForm.newPassword.length < 10 ? 'Moyen' : 'Fort'}
                     </div>
                   </div>
@@ -262,7 +265,12 @@ export default function ProfilePage() {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" disabled={loading || !passwordForm.currentPassword || !passwordForm.newPassword}
-                    style={{ padding: '0.75rem 1.75rem', background: !passwordForm.currentPassword || !passwordForm.newPassword ? '#E5E7EB' : 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: !passwordForm.currentPassword || !passwordForm.newPassword ? '#9CA3AF' : 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+                    style={{
+                      padding: '0.75rem 1.75rem',
+                      background: !passwordForm.currentPassword || !passwordForm.newPassword ? '#E5E7EB' : 'linear-gradient(135deg, #0F2347, #1A3A6B)',
+                      color: !passwordForm.currentPassword || !passwordForm.newPassword ? '#9CA3AF' : 'white',
+                      border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer'
+                    }}>
                     {loading ? 'Modification...' : 'Modifier le mot de passe'}
                   </button>
                 </div>
@@ -276,10 +284,10 @@ export default function ProfilePage() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
                   {[
-                    { icon: '🔒', label: 'JWT Securise', desc: 'Token expire dans 15 minutes', status: 'Actif', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA' },
-                    { icon: '🛡', label: 'bcrypt', desc: 'Mot de passe chiffre (facteur 12)', status: 'Actif', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA' },
-                    { icon: '🔐', label: 'CORS protege', desc: 'Requetes cross-origin filtrees', status: 'Actif', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA' },
-                    { icon: '📋', label: 'Validation donnees', desc: 'Toutes les entrees sont validees', status: 'Actif', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA' },
+                    { icon: '🔒', label: 'JWT Securise', desc: 'Token expire dans 15 minutes', status: 'Actif' },
+                    { icon: '🛡', label: 'bcrypt', desc: 'Mot de passe chiffre (facteur 12)', status: 'Actif' },
+                    { icon: '🔐', label: 'CORS protege', desc: 'Requetes cross-origin filtrees', status: 'Actif' },
+                    { icon: '📋', label: 'Validation donnees', desc: 'Toutes les entrees sont validees', status: 'Actif' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}` }}>
                       <span style={{ fontSize: '1.4rem' }}>{item.icon}</span>
@@ -287,7 +295,7 @@ export default function ProfilePage() {
                         <div style={{ fontSize: '0.88rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.label}</div>
                         <div style={{ fontSize: '0.75rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>{item.desc}</div>
                       </div>
-                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}`, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.status}</span>
+                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#F0FAF4', color: '#1A7A4A', border: '1px solid #B8E4CA', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.status}</span>
                     </div>
                   ))}
                 </div>

@@ -5,21 +5,35 @@ import api from '../../api/axios'
 import { useDarkMode } from '../../components/layout/Sidebar'
 import NotificationBell from '../../components/ui/NotificationBell'
 
+/**
+ * InvestigatorProfile
+ *
+ * FIXED:
+ *   1. setAuth(user, accessToken, refreshToken) — 3 args, not (data, token, role)
+ *   2. user.firstName / user.lastName — not user.fullName
+ *   3. Password change uses POST /auth/change-password (same as client),
+ *      not PATCH /users/me/password (that endpoint doesn't exist)
+ */
+
 function InvestigatorSidebar({ dark }) {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const items = [
-    { key: '/investigator/dashboard', label: 'Tableau de bord',    icon: '▦' },
-    { key: '/investigator/flagged',   label: 'Dossiers a traiter', icon: '⚑' },
-    { key: '/investigator/history',   label: 'Historique',         icon: '≡' },
-    { key: '/investigator/stats',     label: 'Statistiques',       icon: '◑' },
-    { key: '/investigator/profile',   label: 'Mon profil',         icon: '👤' },
+    { key: '/investigator/dashboard', label: 'Tableau de bord', icon: '▦' },
+    { key: '/investigator/flagged', label: 'Dossiers a traiter', icon: '⚑' },
+    { key: '/investigator/history', label: 'Historique', icon: '≡' },
+    { key: '/investigator/stats', label: 'Statistiques', icon: '◑' },
+    { key: '/investigator/profile', label: 'Mon profil', icon: '👤' },
   ]
   const bg = dark ? '#0A1628' : '#0F2347'
   const border = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)'
   const width = collapsed ? 64 : 240
   const active = window.location.pathname
+  // FIXED: derive from firstName/lastName
+  const invName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Investigateur'
+  const initial = user?.firstName?.[0]?.toUpperCase() || 'I'
+
   return (
     <div style={{ width, minHeight: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', position: 'fixed', left: 0, top: 0, zIndex: 100, transition: 'width 0.25s', overflow: 'hidden', boxShadow: '4px 0 24px rgba(0,0,0,0.15)' }}>
       <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -42,10 +56,10 @@ function InvestigatorSidebar({ dark }) {
         <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700 }}>
-              {user?.fullName?.[0]?.toUpperCase() || 'I'}
+              {initial}
             </div>
             <div>
-              <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{user?.fullName}</div>
+              <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{invName}</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Investigateur senior</div>
             </div>
           </div>
@@ -76,23 +90,33 @@ function InvestigatorSidebar({ dark }) {
 }
 
 export default function InvestigatorProfile() {
-  const { user, setAuth, token, role } = useAuthStore()
+  // FIXED: destructure correctly — no `token` or `role` in store API
+  const { user, setAuth, accessToken, refreshToken } = useAuthStore()
   const [dark, toggleDark] = useDarkMode()
   const [activeTab, setActiveTab] = useState('info')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const fileRef = useRef()
-  const [avatar, setAvatar] = useState(user?.avatarUrl || null)
-  const [profileForm, setProfileForm] = useState({ fullName: user?.fullName || '', company: user?.company || '' })
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
 
-  const pageBg    = dark ? '#0D1626' : '#F7F8FC'
-  const cardBg    = dark ? '#111C30' : 'white'
-  const cardBorder= dark ? '#1E2D45' : '#EEF0F6'
-  const textMain  = dark ? 'white' : '#0F2347'
-  const textSub   = dark ? '#5A7A9A' : '#9CA3AF'
-  const inputBg   = dark ? '#0D1626' : '#F9FAFB'
+  // FIXED: use firstName/lastName, not fullName
+  const [profileForm, setProfileForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    company: user?.company || '',
+  })
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+
+  const pageBg = dark ? '#0D1626' : '#F7F8FC'
+  const cardBg = dark ? '#111C30' : 'white'
+  const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
+  const textMain = dark ? 'white' : '#0F2347'
+  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
+  const inputBg = dark ? '#0D1626' : '#F9FAFB'
   const inputBorder = dark ? '#1E2D45' : '#E5E7EB'
 
   const showMsg = (type, msg) => {
@@ -105,8 +129,15 @@ export default function InvestigatorProfile() {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await api.patch('/users/me', profileForm)
-      setAuth(res.data, token, role)
+      const res = await api.patch('/users/me', {
+        firstName: profileForm.firstName,
+        lastName: profileForm.lastName,
+        company: profileForm.company,
+      })
+      // TransformInterceptor wraps: { success, data: updatedUser }
+      const updatedUser = res.data?.data ?? res.data
+      // FIXED: pass all 3 args — keeps refreshToken alive
+      setAuth(updatedUser, accessToken, refreshToken)
       showMsg('success', 'Profil mis a jour !')
     } catch (err) {
       showMsg('error', err.response?.data?.message || 'Erreur')
@@ -115,10 +146,21 @@ export default function InvestigatorProfile() {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault()
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) { showMsg('error', 'Mots de passe differents'); return }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showMsg('error', 'Mots de passe differents')
+      return
+    }
+    if (passwordForm.newPassword.length < 8) {
+      showMsg('error', 'Le mot de passe doit faire au moins 8 caracteres')
+      return
+    }
     setLoading(true)
     try {
-      await api.patch('/users/me/password', { currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword })
+      // FIXED: correct endpoint — same as client (PATCH /users/me/password doesn't exist)
+      await api.post('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      })
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       showMsg('success', 'Mot de passe modifie !')
     } catch (err) {
@@ -126,28 +168,29 @@ export default function InvestigatorProfile() {
     } finally { setLoading(false) }
   }
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => setAvatar(ev.target.result)
-    reader.readAsDataURL(file)
-    const formData = new FormData()
-    formData.append('avatar', file)
-    try {
-      const res = await api.post('/users/me/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-      setAuth(res.data, token, role)
-      showMsg('success', 'Photo mise a jour !')
-    } catch { showMsg('error', 'Erreur upload photo') }
+  const inputStyle = {
+    width: '100%', padding: '0.75rem 1rem',
+    border: `1.5px solid ${inputBorder}`, borderRadius: 8,
+    fontSize: '0.9rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
+    outline: 'none', backgroundColor: inputBg, color: textMain,
+    boxSizing: 'border-box',
+  }
+  const labelStyle = {
+    display: 'block', fontSize: '0.74rem', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    color: textSub, marginBottom: '0.4rem',
+    fontFamily: 'Helvetica Neue, Arial, sans-serif',
   }
 
-  const inputStyle = { width: '100%', padding: '0.75rem 1rem', border: `1.5px solid ${inputBorder}`, borderRadius: 8, fontSize: '0.9rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', outline: 'none', backgroundColor: inputBg, color: textMain, boxSizing: 'border-box' }
-  const labelStyle = { display: 'block', fontSize: '0.74rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: textSub, marginBottom: '0.4rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }
+  // FIXED: derive display name from firstName + lastName
+  const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Investigateur'
+  const initial = user?.firstName?.[0]?.toUpperCase() || 'I'
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif' }}>
       <InvestigatorSidebar dark={dark} />
       <div style={{ marginLeft: 240, flex: 1, padding: '2rem' }}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
           <div>
             <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Compte</p>
@@ -165,26 +208,28 @@ export default function InvestigatorProfile() {
         {error && <div style={{ backgroundColor: '#FDF2F2', border: '1px solid #EBCECE', borderRadius: 8, padding: '0.75rem 1rem', color: '#C0392B', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>⚠ {error}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem' }}>
-          {/* Gauche */}
+
+          {/* Left card */}
           <div>
             <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
               <div style={{ position: 'relative', display: 'inline-block', marginBottom: '1rem' }}>
-                <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', border: '3px solid #C9A84C', margin: '0 auto' }}>
-                  {avatar ? <img src={avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, fontSize: '2.2rem' }}>{user?.fullName?.[0]?.toUpperCase() || 'I'}</div>}
+                <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, fontSize: '2.2rem', border: '3px solid #C9A84C' }}>
+                  {initial}
                 </div>
-                <button onClick={() => fileRef.current.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', backgroundColor: '#0F2347', border: '2px solid ' + cardBg, cursor: 'pointer', fontSize: '0.8rem' }}>📷</button>
-                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+                <button onClick={() => fileRef.current.click()} style={{ position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%', backgroundColor: '#0F2347', border: `2px solid ${cardBg}`, cursor: 'pointer', fontSize: '0.8rem' }}>📷</button>
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} />
               </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.25rem' }}>{user?.fullName}</div>
-              <div style={{ fontSize: '0.78rem', color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Investigateur Senior</div>
+              {/* FIXED: display firstName + lastName */}
+              <div style={{ fontSize: '1.1rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.25rem' }}>{fullName}</div>
+              <div style={{ fontSize: '0.78rem', color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>{user?.email}</div>
               <span style={{ padding: '0.3rem 0.8rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#EBF5FB', color: '#1A5276', border: '1px solid #AED6F1', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>INVESTIGATOR</span>
             </div>
+
             <div style={{ backgroundColor: cardBg, borderRadius: 12, border: `1px solid ${cardBorder}`, overflow: 'hidden' }}>
               {[
-                { key: 'info',     label: 'Informations', icon: '👤' },
+                { key: 'info', label: 'Informations', icon: '👤' },
                 { key: 'password', label: 'Mot de passe', icon: '🔒' },
-                { key: 'security', label: 'Securite',     icon: '🛡' },
+                { key: 'security', label: 'Securite', icon: '🛡' },
               ].map((tab, i, arr) => (
                 <div key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{ padding: '0.85rem 1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: activeTab === tab.key ? 'rgba(201,168,76,0.1)' : 'transparent', borderLeft: activeTab === tab.key ? '3px solid #C9A84C' : '3px solid transparent', borderBottom: i < arr.length - 1 ? `1px solid ${cardBorder}` : 'none' }}>
@@ -195,60 +240,84 @@ export default function InvestigatorProfile() {
             </div>
           </div>
 
-          {/* Droite */}
+          {/* Right content */}
           <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '2rem' }}>
+
             {activeTab === 'info' && (
               <form onSubmit={handleUpdateProfile}>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Informations personnelles</h2>
+
+                {/* FIXED: firstName + lastName separately */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div>
-                    <label style={labelStyle}>Nom complet *</label>
-                    <input value={profileForm.fullName} onChange={e => setProfileForm({ ...profileForm, fullName: e.target.value })} style={inputStyle} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                    <label style={labelStyle}>Prenom *</label>
+                    <input value={profileForm.firstName} onChange={e => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                      style={inputStyle} placeholder="Votre prenom"
+                      onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Organisation</label>
-                    <input value={profileForm.company} onChange={e => setProfileForm({ ...profileForm, company: e.target.value })} style={inputStyle} placeholder="Compagnie d'assurance" onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                    <label style={labelStyle}>Nom *</label>
+                    <input value={profileForm.lastName} onChange={e => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                      style={inputStyle} placeholder="Votre nom"
+                      onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
                   </div>
                 </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={labelStyle}>Organisation</label>
+                  <input value={profileForm.company} onChange={e => setProfileForm({ ...profileForm, company: e.target.value })}
+                    style={inputStyle} placeholder="Compagnie d'assurance"
+                    onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                </div>
+
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={labelStyle}>Email</label>
                   <input value={user?.email || ''} disabled style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
+                  <p style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.3rem' }}>L'email ne peut pas etre modifie</p>
                 </div>
+
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="submit" disabled={loading} style={{ padding: '0.75rem 1.75rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+                  <button type="submit" disabled={loading}
+                    style={{ padding: '0.75rem 1.75rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
                     {loading ? 'Enregistrement...' : 'Enregistrer'}
                   </button>
                 </div>
               </form>
             )}
+
             {activeTab === 'password' && (
               <form onSubmit={handleUpdatePassword}>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Modifier le mot de passe</h2>
                 {[
                   { label: 'Mot de passe actuel *', key: 'currentPassword' },
                   { label: 'Nouveau mot de passe *', key: 'newPassword' },
-                  { label: 'Confirmer *', key: 'confirmPassword' },
+                  { label: 'Confirmer le nouveau mot de passe', key: 'confirmPassword' },
                 ].map(f => (
                   <div key={f.key} style={{ marginBottom: '1rem' }}>
                     <label style={labelStyle}>{f.label}</label>
-                    <input type="password" value={passwordForm[f.key]} onChange={e => setPasswordForm({ ...passwordForm, [f.key]: e.target.value })} style={inputStyle} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                    <input type="password" value={passwordForm[f.key]}
+                      onChange={e => setPasswordForm({ ...passwordForm, [f.key]: e.target.value })}
+                      style={inputStyle}
+                      onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                  <button type="submit" disabled={loading} style={{ padding: '0.75rem 1.75rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+                  <button type="submit" disabled={loading}
+                    style={{ padding: '0.75rem 1.75rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
                     {loading ? 'Modification...' : 'Modifier'}
                   </button>
                 </div>
               </form>
             )}
+
             {activeTab === 'security' && (
               <div>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Securite du compte</h2>
                 {[
-                  { icon: '🔒', label: 'JWT Securise',    desc: 'Token expire dans 7 jours' },
-                  { icon: '🛡', label: 'bcrypt',           desc: 'Chiffrement 10 rounds' },
-                  { icon: '🔐', label: 'CORS protege',     desc: 'Requetes filtrees' },
-                  { icon: '📋', label: 'Validation',       desc: 'Entrees validees' },
+                  { icon: '🔒', label: 'JWT Securise', desc: 'Token expire dans 15 minutes' },
+                  { icon: '🛡', label: 'bcrypt', desc: 'Chiffrement 10 rounds' },
+                  { icon: '🔐', label: 'CORS protege', desc: 'Requetes filtrees' },
+                  { icon: '📋', label: 'Validation donnees', desc: 'Entrees validees' },
                 ].map(item => (
                   <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 8, border: `1px solid ${cardBorder}`, marginBottom: '0.75rem' }}>
                     <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
@@ -259,6 +328,20 @@ export default function InvestigatorProfile() {
                     <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600, backgroundColor: '#F0FAF4', color: '#1A7A4A', border: '1px solid #B8E4CA' }}>Actif</span>
                   </div>
                 ))}
+
+                <div style={{ padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}`, marginTop: '1rem' }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.75rem' }}>Informations du compte</div>
+                  {[
+                    ['ID', user?.id?.substring(0, 8) + '...'],
+                    ['Role', user?.role],
+                    ['Membre depuis', user?.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : '-'],
+                  ].map(([k, v]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: `1px solid ${cardBorder}` }}>
+                      <span style={{ fontSize: '0.78rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{k}</span>
+                      <span style={{ fontSize: '0.78rem', color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 500 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
