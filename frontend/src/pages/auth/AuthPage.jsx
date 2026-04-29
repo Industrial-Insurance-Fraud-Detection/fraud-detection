@@ -14,10 +14,10 @@ export default function AuthPage() {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [registerForm, setRegisterForm] = useState({
     firstName: '', lastName: '', company: '', email: '', password: '', confirmPassword: '',
+    phone: '', wilaya: '',
   })
 
   // ── Login ──────────────────────────────────────────────────────────────────
-
   const handleLogin = async (e) => {
     e.preventDefault()
     setError(''); setSuccess('')
@@ -30,12 +30,9 @@ export default function AuthPage() {
         email: loginForm.email,
         password: loginForm.password,
       })
-      // Backend wraps response in { success, data: { accessToken, refreshToken, user } }
       const payload = res.data?.data ?? res.data
       const { accessToken, refreshToken, user } = payload
-
       setAuth(user, accessToken, refreshToken)
-
       if (user.role === 'CLIENT') navigate('/client/dashboard')
       else navigate('/investigator/dashboard')
     } catch (err) {
@@ -47,9 +44,6 @@ export default function AuthPage() {
   }
 
   // ── Register ───────────────────────────────────────────────────────────────
-  // Note: backend always assigns CLIENT role on register.
-  // Investigator accounts are created manually by an admin.
-
   const handleRegister = async (e) => {
     e.preventDefault()
     setError(''); setSuccess('')
@@ -70,10 +64,12 @@ export default function AuthPage() {
         company: registerForm.company || undefined,
         email: registerForm.email,
         password: registerForm.password,
+        phone: registerForm.phone || undefined,
+        wilaya: registerForm.wilaya || undefined,
       })
       setSuccess('Compte cree avec succes ! Connectez-vous.')
       setTab('login')
-      setRegisterForm({ firstName: '', lastName: '', company: '', email: '', password: '', confirmPassword: '' })
+      setRegisterForm({ firstName: '', lastName: '', company: '', email: '', password: '', confirmPassword: '', phone: '', wilaya: '' })
     } catch (err) {
       const msg = err.response?.data?.message
       setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Erreur lors de la creation du compte.')
@@ -81,8 +77,6 @@ export default function AuthPage() {
       setLoading(false)
     }
   }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const switchTab = (t) => { setTab(t); setError(''); setSuccess('') }
 
@@ -99,22 +93,18 @@ export default function AuthPage() {
     fontFamily: 'Helvetica Neue, Arial, sans-serif',
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'Georgia, serif' }}>
 
-      {/* ── LEFT PANEL ─────────────────────────────────────────────────────── */}
+      {/* ── LEFT PANEL ── */}
       <div style={{
         width: '45%',
         background: 'linear-gradient(155deg, #0F2347 0%, #1A3A6B 60%, #0D1E3D 100%)',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         padding: '3rem', position: 'relative', overflow: 'hidden',
       }}>
-        {/* decorative glow */}
         <div style={{ position: 'absolute', top: 0, right: 0, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, #C9A84C, transparent)', opacity: 0.12, transform: 'translate(30%, -30%)' }} />
 
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 1 }}>
           <div style={{ width: 42, height: 42, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🛡</div>
           <div>
@@ -123,7 +113,6 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Hero */}
         <div style={{ zIndex: 1 }}>
           <h1 style={{ color: 'white', fontSize: '2.4rem', fontWeight: 400, lineHeight: 1.25, marginBottom: '1.2rem' }}>
             Detection de fraude<br />
@@ -133,8 +122,6 @@ export default function AuthPage() {
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.92rem', lineHeight: 1.75, marginBottom: '2rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', maxWidth: 300 }}>
             Analyse multimodale des sinistres industriels — donnees capteurs, photographies et rapports traites en temps reel.
           </p>
-
-          {/* Metrics */}
           <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
             {[['4', 'Modeles IA'], ['<5m', 'Analyse complete'], ['80%+', 'Precision']].map(([v, l]) => (
               <div key={l}>
@@ -143,8 +130,6 @@ export default function AuthPage() {
               </div>
             ))}
           </div>
-
-          {/* Feature list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
             {[
               'Isolation Forest + LSTM pour anomalies capteurs',
@@ -165,7 +150,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ────────────────────────────────────────────────────── */}
+      {/* ── RIGHT PANEL ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem 4rem', backgroundColor: 'white' }}>
         <div style={{ maxWidth: 420, width: '100%', margin: '0 auto' }}>
 
@@ -191,11 +176,10 @@ export default function AuthPage() {
             ))}
           </div>
 
-          {/* Alert banners */}
           {error && <div style={{ backgroundColor: '#FDF2F2', border: '1px solid #EBCECE', borderRadius: 6, padding: '0.7rem 0.9rem', color: '#C0392B', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>⚠ {error}</div>}
           {success && <div style={{ backgroundColor: '#F0FAF4', border: '1px solid #B8E4CA', borderRadius: 6, padding: '0.7rem 0.9rem', color: '#1A7A4A', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>✓ {success}</div>}
 
-          {/* ── LOGIN FORM ─────────────────────────────────────────────────── */}
+          {/* ── LOGIN FORM ── */}
           {tab === 'login' && (
             <form onSubmit={handleLogin}>
               {[
@@ -214,23 +198,29 @@ export default function AuthPage() {
                   />
                 </div>
               ))}
+
+              {/* Forgot password link */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem', marginTop: '-0.5rem' }}>
+                <span onClick={() => navigate('/forgot-password')}
+                  style={{ fontSize: '0.78rem', color: '#0F2347', cursor: 'pointer', fontFamily: 'Helvetica Neue, Arial, sans-serif', textDecoration: 'underline' }}>
+                  Mot de passe oublié ?
+                </span>
+              </div>
+
               <button type="submit" disabled={loading}
-                style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.86rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 15px rgba(15,35,71,0.25)', marginTop: '0.5rem' }}>
+                style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.86rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 15px rgba(15,35,71,0.25)' }}>
                 {loading ? 'Connexion en cours...' : 'Se connecter'}
               </button>
 
-              {/* Info banner: investigators cannot self-register */}
               <div style={{ marginTop: '1rem', padding: '0.6rem 0.85rem', backgroundColor: '#EBF5FB', border: '1px solid #AED6F1', borderRadius: 6, fontSize: '0.75rem', color: '#1A5276', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                 ℹ Les comptes investigateurs sont crees par l'administrateur.
               </div>
             </form>
           )}
 
-          {/* ── REGISTER FORM ──────────────────────────────────────────────── */}
+          {/* ── REGISTER FORM ── */}
           {tab === 'register' && (
             <form onSubmit={handleRegister}>
-
-              {/* First + Last name */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
                 <div>
                   <label style={labelStyle}>Prenom *</label>
@@ -250,10 +240,40 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              {/* Other fields */}
               {[
-                { label: 'Entreprise', name: 'company', type: 'text', placeholder: 'Nom de votre entreprise (optionnel)' },
+                { label: 'Entreprise', name: 'company', type: 'text', placeholder: "Nom de votre entreprise (optionnel)" },
                 { label: 'Adresse email *', name: 'email', type: 'email', placeholder: 'votre@email.com' },
+              ].map(f => (
+                <div key={f.name} style={{ marginBottom: '0.8rem' }}>
+                  <label style={labelStyle}>{f.label}</label>
+                  <input type={f.type} placeholder={f.placeholder} value={registerForm[f.name]}
+                    onChange={e => setRegisterForm({ ...registerForm, [f.name]: e.target.value })}
+                    style={inputStyle}
+                    onFocus={e => e.target.style.borderColor = '#0F2347'}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                </div>
+              ))}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
+                <div>
+                  <label style={labelStyle}>Téléphone</label>
+                  <input type="tel" placeholder="0550000001" value={registerForm.phone}
+                    onChange={e => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                    style={inputStyle}
+                    onFocus={e => e.target.style.borderColor = '#0F2347'}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Wilaya</label>
+                  <input type="text" placeholder="Ex: Boumerdès" value={registerForm.wilaya}
+                    onChange={e => setRegisterForm({ ...registerForm, wilaya: e.target.value })}
+                    style={inputStyle}
+                    onFocus={e => e.target.style.borderColor = '#0F2347'}
+                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                </div>
+              </div>
+
+              {[
                 { label: 'Mot de passe * (maj + min + chiffre)', name: 'password', type: 'password', placeholder: 'Ex: MonMotDePasse1' },
                 { label: 'Confirmer le mot de passe *', name: 'confirmPassword', type: 'password', placeholder: 'Repetez le mot de passe' },
               ].map(f => (
@@ -274,7 +294,6 @@ export default function AuthPage() {
             </form>
           )}
 
-          {/* Tab switch link */}
           <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
             {tab === 'login' ? 'Pas encore de compte ? ' : 'Deja un compte ? '}
             <span onClick={() => switchTab(tab === 'login' ? 'register' : 'login')}
@@ -283,7 +302,6 @@ export default function AuthPage() {
             </span>
           </p>
 
-          {/* Trust badges */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #F3F4F6' }}>
             {['JWT Securise', 'HTTPS', 'bcrypt'].map(label => (
               <div key={label} style={{ color: '#9CA3AF', fontSize: '0.72rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{label}</div>

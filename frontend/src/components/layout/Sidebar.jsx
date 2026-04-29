@@ -19,6 +19,7 @@ const CLIENT_ITEMS = [
   { key: '/client/dashboard', label: 'Tableau de bord', icon: '▦' },
   { key: '/client/new-claim', label: 'Nouveau sinistre', icon: '+' },
   { key: '/client/claims', label: 'Mes sinistres', icon: '≡' },
+  { key: '/client/equipment', label: 'Mes équipements', icon: '⚙' },
   { key: '/client/stats', label: 'Statistiques', icon: '◉' },
   { key: '/client/profile', label: 'Mon profil', icon: '👤' },
 ]
@@ -45,7 +46,6 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
   const bg = dark ? '#0A1628' : '#0F2347'
   const border = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)'
 
-  // Build display name from firstName + lastName (backend never returns fullName)
   const fullName = user
     ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Utilisateur'
     : 'Utilisateur'
@@ -64,7 +64,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
       boxShadow: '4px 0 24px rgba(0,0,0,0.15)',
     }}>
 
-      {/* ── Logo + collapse ───────────────────────────────────────────────── */}
+      {/* ── Logo + collapse ── */}
       <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -89,7 +89,6 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         )}
       </div>
 
-      {/* Expand button when collapsed */}
       {collapsed && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0', borderBottom: `1px solid ${border}` }}>
           <button onClick={() => setCollapsed(false)}
@@ -99,7 +98,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         </div>
       )}
 
-      {/* ── User info ────────────────────────────────────────────────────── */}
+      {/* ── User info ── */}
       {!collapsed && (
         <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -121,7 +120,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         </div>
       )}
 
-      {/* ── Nav items ────────────────────────────────────────────────────── */}
+      {/* ── Nav items ── */}
       <nav style={{ flex: 1, padding: '0.75rem 0', overflowY: 'auto' }}>
         {items.map(item => {
           const isActive = active === item.key || active.startsWith(item.key + '/')
@@ -160,7 +159,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
         })}
       </nav>
 
-      {/* ── Footer / logout ──────────────────────────────────────────────── */}
+      {/* ── Footer / logout ── */}
       <div style={{ padding: collapsed ? '0.75rem' : '1rem 1.5rem', borderTop: `1px solid ${border}` }}>
         <div
           onClick={() => { logout(); window.location.href = '/login' }}

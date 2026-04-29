@@ -6,26 +6,17 @@ import api from '../../api/axios'
 /**
  * ClaimDetail
  *
- * GET /claims/:id  →  { success, data: Claim }
+ * Features:
+ *  - View claim detail (19)
+ *  - Download files via presigned URL (24) — GET /files/:id/url
  *
- * Claim shape (from claims.service.ts findOne):
- *   claim.equipment          object { id, name, type, ... }
- *   claim.client             object { id, firstName, lastName, ... }
- *   claim.files              ClaimFile[]
- *   claim.analysis           AIAnalysis | null
- *     .finalScore            number
- *     .anomalyScore          number
- *     .classificationScore   number
- *     .nlpScore              number
- *     .visionScore           number
- *     .fraudClass            string
- *   claim.decision           Decision | null
- *     .outcome               APPROVED | REJECTED
- *     .notes                 string
- *     .type                  AUTO | HUMAN
- *     .createdAt             string
- *     .investigator          { firstName, lastName, email } | null
- *   claim.claimedAmount      number  (never "amount")
+ * Claim shape:
+ *   claim.equipment          { name, type, ... }
+ *   claim.client             { id, firstName, lastName, ... }
+ *   claim.files              ClaimFile[]  { id, fileName, fileType, fileSize, minioPath }
+ *   claim.analysis           { finalScore, anomalyScore, classificationScore, nlpScore, visionScore, fraudClass }
+ *   claim.decision           { outcome, notes, type, createdAt, investigator }
+ *   claim.claimedAmount      number
  *   claim.pdfUrl             string | null
  */
 
@@ -89,6 +80,51 @@ function AIModelCard({ title, score, weight }) {
   )
 }
 
+// ── File row with download button ─────────────────────────────────────────────
+function FileRow({ file }) {
+  const [downloading, setDownloading] = useState(false)
+  const [dlError, setDlError] = useState('')
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    setDlError('')
+    try {
+      // GET /files/:id/url  →  { url, fileName, fileType, fileSize, expiresIn }
+      const res = await api.get(`/files/${file.id}/url`)
+      const data = res.data?.data ?? res.data
+      // Open the presigned URL in a new tab for download
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setDlError('Erreur de téléchargement')
+      console.error('Download error:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const icon = file.fileType === 'CSV' ? '📊' : file.fileType === 'PHOTO' ? '🖼' : '📄'
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.9rem', backgroundColor: '#F9FAFB', borderRadius: 8, border: '1px solid #EEF0F6' }}>
+      <span style={{ fontSize: '1rem' }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{file.fileName}</div>
+        <div style={{ fontSize: '0.68rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+          {file.fileType} — {file.fileSize ? `${(file.fileSize / 1024).toFixed(1)} KB` : ''}
+        </div>
+        {dlError && <div style={{ fontSize: '0.65rem', color: '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{dlError}</div>}
+      </div>
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        title="Télécharger le fichier (lien valide 15 minutes)"
+        style={{ padding: '0.35rem 0.8rem', background: downloading ? '#E5E7EB' : 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: downloading ? '#9CA3AF' : 'white', border: 'none', borderRadius: 6, fontSize: '0.72rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: downloading ? 'not-allowed' : 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+        {downloading ? '...' : '↓ Télécharger'}
+      </button>
+    </div>
+  )
+}
+
 export default function ClaimDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -100,7 +136,6 @@ export default function ClaimDetail() {
   const fetchClaim = () =>
     api.get(`/claims/${id}`)
       .then(res => {
-        // TransformInterceptor → { success, data: Claim }
         const data = res.data?.data ?? res.data
         setClaim(data)
       })
@@ -112,15 +147,13 @@ export default function ClaimDetail() {
 
   useEffect(() => { fetchClaim() }, [id])
 
-  // Poll while still processing
   useEffect(() => {
     if (!claim) return
     if (!['ANALYZING', 'PENDING'].includes(claim.status)) return
-    const id_interval = setInterval(fetchClaim, 5000)
-    return () => clearInterval(id_interval)
+    const interval = setInterval(fetchClaim, 5000)
+    return () => clearInterval(interval)
   }, [claim?.status])
 
-  // ── Loading / Error ──────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F7F8FC', alignItems: 'center', justifyContent: 'center', fontFamily: 'Helvetica Neue, Arial, sans-serif', color: '#9CA3AF' }}>
       Chargement...
@@ -138,10 +171,7 @@ export default function ClaimDetail() {
     </div>
   )
 
-  // ── Data extraction ──────────────────────────────────────────────────────
   const sc = STATUS_CONFIG[claim.status] || STATUS_CONFIG['PENDING']
-
-  // analysis is a nested object, NOT top-level fields
   const analysis = claim.analysis || null
   const finalScore = analysis?.finalScore ?? null
   const anomalyScore = analysis?.anomalyScore ?? null
@@ -149,16 +179,12 @@ export default function ClaimDetail() {
   const nlpScore = analysis?.nlpScore ?? null
   const visionScore = analysis?.visionScore ?? null
   const fraudClass = analysis?.fraudClass ?? null
-
-  // decision nested object
   const decision = claim.decision || null
   const investigatorNotes = decision?.notes ?? null
   const decidedAt = decision?.createdAt ?? null
   const investigatorName = decision?.investigator
     ? `${decision.investigator.firstName || ''} ${decision.investigator.lastName || ''}`.trim()
     : decision?.type === 'AUTO' ? 'Système IA (automatique)' : null
-
-  // equipment is an object
   const equipmentName = claim.equipment?.name || '—'
   const equipmentType = claim.equipment?.type || '—'
 
@@ -233,29 +259,26 @@ export default function ClaimDetail() {
               </div>
             </div>
 
-            {/* Files */}
+            {/* Files — with download buttons */}
             {claim.files?.length > 0 && (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
-                <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>
-                  Fichiers joints ({claim.files.length})
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', margin: 0 }}>
+                    Fichiers joints ({claim.files.length})
+                  </h2>
+                  <div style={{ fontSize: '0.72rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+                    Liens valides 15 minutes
+                  </div>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {claim.files.map(f => (
-                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.9rem', backgroundColor: '#F9FAFB', borderRadius: 8, border: '1px solid #EEF0F6' }}>
-                      <span style={{ fontSize: '1rem' }}>{f.fileType === 'CSV' ? '📊' : f.fileType === 'PHOTO' ? '🖼' : '📄'}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 500, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{f.fileName}</div>
-                        <div style={{ fontSize: '0.68rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-                          {f.fileType} — {f.fileSize ? `${(f.fileSize / 1024).toFixed(1)} KB` : ''}
-                        </div>
-                      </div>
-                    </div>
+                    <FileRow key={f.id} file={f} />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* AI Analysis — only when analysis exists */}
+            {/* AI Analysis */}
             {analysis && finalScore != null && (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', padding: '1.5rem', marginBottom: '1.5rem' }}>
                 <h2 style={{ color: '#0F2347', fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>
@@ -265,7 +288,6 @@ export default function ClaimDetail() {
                 {classificationScore != null && <AIModelCard title="Modèle 2 — Classification panne" score={classificationScore} weight="25%" />}
                 {nlpScore != null && <AIModelCard title="Modèle 3 — Analyse rapport NLP" score={nlpScore} weight="20%" />}
                 {visionScore != null && <AIModelCard title="Modèle 4 — Vérification photos" score={visionScore} weight="20%" />}
-
                 <div style={{ backgroundColor: '#F7F8FC', border: '1px solid #EEF0F6', borderRadius: 8, padding: '0.75rem 1rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F2347', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Score final combiné</span>
                   <span style={{ fontSize: '1.2rem', fontWeight: 700, color: finalScore > 70 ? '#C0392B' : finalScore > 30 ? '#F39C12' : '#1A7A4A', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
@@ -291,21 +313,17 @@ export default function ClaimDetail() {
                     </span>
                   )}
                 </h2>
-
-                {/* Outcome badge */}
                 <div style={{ marginBottom: '0.75rem' }}>
                   <span style={{ padding: '0.3rem 0.8rem', borderRadius: 20, fontSize: '0.78rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: decision.outcome === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', color: decision.outcome === 'APPROVED' ? '#1A7A4A' : '#C0392B', border: `1px solid ${decision.outcome === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}` }}>
                     {decision.outcome === 'APPROVED' ? '✓ Approuvé' : '✕ Rejeté'}
                     {decision.type === 'AUTO' ? ' (automatique)' : ' (humain)'}
                   </span>
                 </div>
-
                 {investigatorNotes && (
                   <div style={{ backgroundColor: decision.outcome === 'APPROVED' ? '#F0FAF4' : '#FDF2F2', border: `1px solid ${decision.outcome === 'APPROVED' ? '#B8E4CA' : '#EBCECE'}`, borderRadius: 8, padding: '0.75rem 1rem', fontSize: '0.88rem', color: decision.outcome === 'APPROVED' ? '#1A7A4A' : '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontStyle: 'italic' }}>
                     "{investigatorNotes}"
                   </div>
                 )}
-
                 {decidedAt && (
                   <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.5rem' }}>
                     Décision prise le {new Date(decidedAt).toLocaleString('fr-FR')}
@@ -317,8 +335,6 @@ export default function ClaimDetail() {
 
           {/* ── Right column ── */}
           <div>
-
-            {/* Score gauge */}
             {finalScore != null ? (
               <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #EEF0F6', marginBottom: '1.5rem' }}>
                 <ScoreGauge score={Math.round(finalScore)} />
