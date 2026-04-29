@@ -1,128 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import { useDarkMode } from '../../components/layout/Sidebar'
+import { InvestigatorSidebar } from '../../components/layout/InvestigatorLayout'
 import NotificationBell from '../../components/ui/NotificationBell'
-import useAuthStore from '../../store/auth.store'
-
-/**
- * InvestigatorStats
- *
- * FIX — `/claims/stats` does NOT exist in the backend.
- *        Removed that call entirely. Stats are now derived
- *        client-side from the `/claims/flagged` response
- *        (which is what the investigator can access).
- *
- *        Note: this endpoint only returns HUMAN_REVIEW claims,
- *        so "approved" / "rejected" totals are not available
- *        without a dedicated backend endpoint. We show only
- *        what we can accurately compute.
- */
 
 function extractArray(data) {
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.items)) return data.items
-  if (Array.isArray(data?.data)) return data.data
-  if (Array.isArray(data?.data?.items)) return data.data.items
-  return []
-}
-
-function clientName(client) {
-  return `${client?.firstName || ''} ${client?.lastName || ''}`.trim() || 'Client'
-}
-
-function InvestigatorSidebar({ dark }) {
-  const navigate = useNavigate()
-  const { logout, user } = useAuthStore()
-  const [collapsed, setCollapsed] = useState(false)
-  const items = [
-    { key: '/investigator/dashboard', label: 'Tableau de bord', icon: '▦' },
-    { key: '/investigator/flagged', label: 'Dossiers a traiter', icon: '⚑' },
-    { key: '/investigator/history', label: 'Historique', icon: '≡' },
-    { key: '/investigator/stats', label: 'Statistiques', icon: '◑' },
-    { key: '/investigator/profile', label: 'Mon profil', icon: '👤' },
-  ]
-  const bg = dark ? '#0A1628' : '#0F2347'
-  const border = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)'
-  const width = collapsed ? 64 : 240
-  const active = window.location.pathname
-  const initial = user?.firstName?.[0]?.toUpperCase() || 'I'
-  const invName = clientName(user)
-
-  return (
-    <div style={{ width, minHeight: '100vh', backgroundColor: bg, display: 'flex', flexDirection: 'column', position: 'fixed', left: 0, top: 0, zIndex: 100, transition: 'width 0.25s', overflow: 'hidden', boxShadow: '4px 0 24px rgba(0,0,0,0.15)' }}>
-      <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {!collapsed ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#0F2347' }}>F</div>
-              <div>
-                <div style={{ color: 'white', fontWeight: 700, fontSize: '0.92rem' }}>FraudGuard AI</div>
-                <div style={{ color: '#C9A84C', fontSize: '0.58rem', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Espace Investigateur</div>
-              </div>
-            </div>
-            <button onClick={() => setCollapsed(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: '1rem' }}>←</button>
-          </>
-        ) : (
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#0F2347', margin: '0 auto', cursor: 'pointer' }} onClick={() => setCollapsed(false)}>F</div>
-        )}
-      </div>
-      {!collapsed && (
-        <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700 }}>{initial}</div>
-            <div>
-              <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600 }}>{invName}</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Investigateur senior</div>
-            </div>
-          </div>
-        </div>
-      )}
-      <nav style={{ flex: 1, padding: '0.75rem 0' }}>
-        {items.map(item => {
-          const isActive = active === item.key
-          return (
-            <div key={item.key} onClick={() => navigate(item.key)}
-              style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', padding: collapsed ? '0.75rem' : '0.75rem 1.5rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', backgroundColor: isActive ? 'rgba(201,168,76,0.12)' : 'transparent', borderLeft: isActive ? '3px solid #C9A84C' : '3px solid transparent', transition: 'all 0.18s' }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)' }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent' }}>
-              <span style={{ color: isActive ? '#C9A84C' : 'rgba(255,255,255,0.45)', width: 20, textAlign: 'center' }}>{item.icon}</span>
-              {!collapsed && <span style={{ color: isActive ? 'white' : 'rgba(255,255,255,0.55)', fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: isActive ? 600 : 400 }}>{item.label}</span>}
-            </div>
-          )
-        })}
-      </nav>
-      <div style={{ padding: collapsed ? '0.75rem' : '1rem 1.5rem', borderTop: `1px solid ${border}` }}>
-        <div onClick={() => { logout(); window.location.href = '/login' }} style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', padding: '0.4rem', borderRadius: 6 }}>
-          <span style={{ color: 'rgba(255,255,255,0.35)' }}>↩</span>
-          {!collapsed && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Deconnexion</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StatCard({ label, value, sub, color, dark }) {
-  const cardBg = dark ? '#111C30' : 'white'
-  const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
-  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
-  return (
-    <div style={{ backgroundColor: cardBg, borderRadius: 14, padding: '1.5rem', border: `1px solid ${cardBorder}`, flex: 1, transition: 'transform 0.18s' }}
-      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-      <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.6rem' }}>{label}</div>
-      <div style={{ fontSize: '2.2rem', fontWeight: 700, color: color || (dark ? 'white' : '#0F2347'), fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: '0.75rem', color: textSub, marginTop: '0.5rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{sub}</div>}
-    </div>
-  )
+  const inner = data?.data ?? data
+  const arr = inner?.data ?? inner
+  return Array.isArray(arr) ? arr : []
 }
 
 function BarChart({ data, dark }) {
   const max = Math.max(...data.map(d => d.value), 1)
   const cardBg = dark ? '#111C30' : 'white'
   const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
-  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
   const textMain = dark ? 'white' : '#0F2347'
+  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
   return (
     <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
       <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>
@@ -142,15 +35,14 @@ function BarChart({ data, dark }) {
 }
 
 export default function InvestigatorStats() {
-  // FIX — removed /claims/stats call (endpoint doesn't exist)
   const [claims, setClaims] = useState([])
   const [loading, setLoading] = useState(true)
   const [dark, toggleDark] = useDarkMode()
 
   useEffect(() => {
-    api.get('/claims/flagged')
+    api.get('/claims/flagged?limit=100')
       .then(res => setClaims(extractArray(res.data)))
-      .catch(err => console.error(err))
+      .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
@@ -160,12 +52,9 @@ export default function InvestigatorStats() {
   const textMain = dark ? 'white' : '#0F2347'
   const textSub = dark ? '#5A7A9A' : '#9CA3AF'
 
-  // Derive all stats client-side from flagged claims
   const total = claims.length
   const urgent = claims.filter(c => (c.analysis?.finalScore ?? 50) >= 60).length
-  const avgScore = total > 0
-    ? Math.round(claims.reduce((s, c) => s + (c.analysis?.finalScore ?? 50), 0) / total)
-    : 0
+  const avgScore = total > 0 ? Math.round(claims.reduce((s, c) => s + (c.analysis?.finalScore ?? 50), 0) / total) : 0
   const totalAmount = claims.reduce((s, c) => s + (c.claimedAmount ?? 0), 0)
 
   const scoreDistrib = [
@@ -185,9 +74,7 @@ export default function InvestigatorStats() {
           <div>
             <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Analyse</p>
             <h1 style={{ fontSize: '1.9rem', color: textMain, fontWeight: 400 }}>Statistiques <strong>dossiers en revision</strong></h1>
-            <p style={{ color: textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
-              Donnees issues des sinistres en cours d'examen humain
-            </p>
+            <p style={{ color: textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>Donnees issues des sinistres en cours d'examen humain</p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <NotificationBell dark={dark} />
@@ -201,17 +88,28 @@ export default function InvestigatorStats() {
           <div style={{ textAlign: 'center', padding: '3rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Chargement...</div>
         ) : (
           <>
+            {/* Stat cards */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-              <StatCard dark={dark} label="Dossiers en revision" value={total} sub="Statut HUMAN_REVIEW" />
-              <StatCard dark={dark} label="Urgents (score ≥ 60)" value={urgent} sub="Priorite haute" color="#C0392B" />
-              <StatCard dark={dark} label="Score IA moyen" value={avgScore} sub="Sur dossiers en cours" color="#1A5276" />
-              <StatCard dark={dark} label="Montant total" value={totalAmount > 0 ? `${(totalAmount / 1000000).toFixed(1)}M DA` : '0 DA'} sub="Valeur en revision" color="#2E86C1" />
+              {[
+                { label: 'Dossiers en revision', value: total, sub: 'Statut HUMAN_REVIEW', color: dark ? 'white' : '#0F2347' },
+                { label: 'Urgents (score >= 60)', value: urgent, sub: 'Priorite haute', color: '#C0392B' },
+                { label: 'Score IA moyen', value: `${avgScore}/100`, sub: 'Sur dossiers en cours', color: '#1A5276' },
+                { label: 'Montant total', value: totalAmount > 0 ? `${(totalAmount / 1000000).toFixed(1)}M DA` : '0 DA', sub: 'Valeur en revision', color: '#2E86C1' },
+              ].map(s => (
+                <div key={s.label} style={{ backgroundColor: cardBg, borderRadius: 14, padding: '1.5rem', border: `1px solid ${cardBorder}`, flex: 1, transition: 'transform 0.18s' }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.6rem' }}>{s.label}</div>
+                  <div style={{ fontSize: '2.2rem', fontWeight: 700, color: s.color, fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: '0.75rem', color: textSub, marginTop: '0.5rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{s.sub}</div>
+                </div>
+              ))}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
               <BarChart data={scoreDistrib} dark={dark} />
 
-              {/* Score bands legend */}
+              {/* Decision thresholds */}
               <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
                 <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1.5rem' }}>Seuils de decision automatique</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -232,22 +130,20 @@ export default function InvestigatorStats() {
               </div>
             </div>
 
-            {/* AI models info */}
+            {/* AI models */}
             <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '1.5rem' }}>
               <h3 style={{ color: textMain, fontSize: '0.95rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>Modeles IA du systeme</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                 {[
-                  { label: 'Modele 1', name: 'Isolation Forest + LSTM', poids: '35%', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA', status: 'Actif' },
-                  { label: 'Modele 2', name: 'XGBoost Classification', poids: '25%', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA', status: 'Actif' },
-                  { label: 'Modele 3', name: 'BERT NLP multilingue', poids: '20%', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA', status: 'Actif' },
-                  { label: 'Modele 4', name: 'YOLOv8 + ELA Vision', poids: '20%', color: '#1A7A4A', bg: '#F0FAF4', border: '#B8E4CA', status: 'Actif' },
+                  { label: 'Modele 1', name: 'Isolation Forest + LSTM', poids: '35%' },
+                  { label: 'Modele 2', name: 'XGBoost Classification', poids: '25%' },
+                  { label: 'Modele 3', name: 'BERT NLP multilingue', poids: '20%' },
+                  { label: 'Modele 4', name: 'YOLOv8 + ELA Vision', poids: '20%' },
                 ].map(m => (
                   <div key={m.label} style={{ padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}` }}>
                     <div style={{ fontSize: '0.7rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>{m.label} — {m.poids}</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.4rem' }}>{m.name}</div>
-                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: m.bg, color: m.color, border: `1px solid ${m.border}` }}>
-                      {m.status}
-                    </span>
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.68rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: '#F0FAF4', color: '#1A7A4A', border: '1px solid #B8E4CA' }}>Actif</span>
                   </div>
                 ))}
               </div>
