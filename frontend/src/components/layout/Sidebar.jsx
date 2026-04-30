@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth.store'
+import api from '../../api/axios'
 
 // ── Dark mode helper hook ─────────────────────────────────────────────────────
 export function useDarkMode() {
@@ -19,7 +20,7 @@ const CLIENT_ITEMS = [
   { key: '/client/dashboard', label: 'Tableau de bord', icon: '▦' },
   { key: '/client/new-claim', label: 'Nouveau sinistre', icon: '+' },
   { key: '/client/claims', label: 'Mes sinistres', icon: '≡' },
-  { key: '/client/equipment', label: 'Mes équipements', icon: '⚙' },
+  { key: '/client/equipment', label: 'Mes equipements', icon: '⚙' },
   { key: '/client/stats', label: 'Statistiques', icon: '◉' },
   { key: '/client/profile', label: 'Mon profil', icon: '👤' },
 ]
@@ -36,7 +37,8 @@ const INVESTIGATOR_ITEMS = [
 export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { logout, user } = useAuthStore()
+  const { logout, refreshToken } = useAuthStore()
+  const { user } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
 
   const items = role === 'CLIENT' ? CLIENT_ITEMS : INVESTIGATOR_ITEMS
@@ -53,6 +55,17 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
   const subtitle = role === 'CLIENT'
     ? (user?.company || 'Client')
     : 'Investigateur'
+
+  // ── FIX: call backend logout before clearing local store ──────────────────
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout', { refreshToken })
+    } catch {
+      // If backend call fails (e.g. token already expired), still clear locally
+    }
+    logout()
+    window.location.href = '/login'
+  }
 
   return (
     <div style={{
@@ -162,7 +175,7 @@ export default function Sidebar({ role = 'CLIENT', badgeCount = 0, dark = false 
       {/* ── Footer / logout ── */}
       <div style={{ padding: collapsed ? '0.75rem' : '1rem 1.5rem', borderTop: `1px solid ${border}` }}>
         <div
-          onClick={() => { logout(); window.location.href = '/login' }}
+          onClick={handleLogout}
           title={collapsed ? 'Deconnexion' : ''}
           style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', padding: '0.4rem', borderRadius: 6, transition: 'background 0.15s' }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}

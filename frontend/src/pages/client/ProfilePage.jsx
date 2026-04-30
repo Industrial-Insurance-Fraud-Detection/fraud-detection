@@ -3,16 +3,8 @@ import useAuthStore from '../../store/auth.store'
 import Sidebar, { useDarkMode } from '../../components/layout/Sidebar'
 import api from '../../api/axios'
 
-/**
- * ProfilePage (Client)
- *
- * FIXED: setAuth(updatedUser, accessToken, refreshToken) — all 3 args.
- * Without the 3rd arg, Zustand sets refreshToken = undefined and the
- * next token refresh will immediately log the user out.
- */
 export default function ProfilePage() {
-  // FIXED: also destructure refreshToken so we can pass it back
-  const { user, setAuth, accessToken, refreshToken } = useAuthStore()
+  const { user, setAuth, accessToken, refreshToken, logout } = useAuthStore()
   const [dark, toggleDark] = useDarkMode()
   const [activeTab, setActiveTab] = useState('info')
   const [loading, setLoading] = useState(false)
@@ -46,6 +38,7 @@ export default function ProfilePage() {
     setTimeout(() => { setSuccess(''); setError('') }, 4000)
   }
 
+  // Feature 10 — update profile
   const handleUpdateProfile = async (e) => {
     e.preventDefault()
     if (!profileForm.firstName.trim() || !profileForm.lastName.trim()) {
@@ -54,15 +47,8 @@ export default function ProfilePage() {
     }
     setLoading(true)
     try {
-      const res = await api.patch('/users/me', {
-        firstName: profileForm.firstName,
-        lastName: profileForm.lastName,
-        company: profileForm.company,
-        phone: profileForm.phone,
-      })
-      // TransformInterceptor wraps in { success, data: updatedUser }
+      const res = await api.patch('/users/me', profileForm)
       const updatedUser = res.data?.data ?? res.data
-      // FIXED: pass all 3 args — refreshToken must not become undefined
       setAuth(updatedUser, accessToken, refreshToken)
       showMsg('success', 'Profil mis a jour avec succes !')
     } catch (err) {
@@ -73,6 +59,7 @@ export default function ProfilePage() {
     }
   }
 
+  // Feature 8 — change password
   const handleUpdatePassword = async (e) => {
     e.preventDefault()
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -97,6 +84,17 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Feature 5 — logout all devices (POST /auth/logout-all)
+  const handleLogoutAll = async () => {
+    try {
+      await api.post('/auth/logout-all')
+    } catch {
+      // ignore — clear locally regardless
+    }
+    logout()
+    window.location.href = '/login'
   }
 
   const inputStyle = {
@@ -170,6 +168,7 @@ export default function ProfilePage() {
           {/* Right content */}
           <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, padding: '2rem' }}>
 
+            {/* Feature 10 — update profile */}
             {activeTab === 'info' && (
               <form onSubmit={handleUpdateProfile}>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Informations personnelles</h2>
@@ -224,10 +223,11 @@ export default function ProfilePage() {
               </form>
             )}
 
+            {/* Feature 8 — change password */}
             {activeTab === 'password' && (
               <form onSubmit={handleUpdatePassword}>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Modifier le mot de passe</h2>
-                <p style={{ color: textSub, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '2rem' }}>Choisissez un mot de passe fort d'au moins 8 caracteres (maj + min + chiffre)</p>
+                <p style={{ color: textSub, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '2rem' }}>Minimum 8 caracteres avec majuscule, minuscule et chiffre</p>
 
                 {[
                   { label: 'Mot de passe actuel *', key: 'currentPassword', placeholder: 'Votre mot de passe actuel' },
@@ -251,13 +251,10 @@ export default function ProfilePage() {
                       <div style={{
                         height: '100%', borderRadius: 3, transition: 'width 0.3s, background 0.3s',
                         width: passwordForm.newPassword.length < 6 ? '25%' : passwordForm.newPassword.length < 10 ? '60%' : '100%',
-                        backgroundColor: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A'
+                        backgroundColor: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A',
                       }} />
                     </div>
-                    <div style={{
-                      fontSize: '0.68rem', marginTop: '0.25rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
-                      color: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A'
-                    }}>
+                    <div style={{ fontSize: '0.68rem', marginTop: '0.25rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', color: passwordForm.newPassword.length < 6 ? '#C0392B' : passwordForm.newPassword.length < 10 ? '#F39C12' : '#1A7A4A' }}>
                       {passwordForm.newPassword.length < 6 ? 'Faible' : passwordForm.newPassword.length < 10 ? 'Moyen' : 'Fort'}
                     </div>
                   </div>
@@ -269,7 +266,7 @@ export default function ProfilePage() {
                       padding: '0.75rem 1.75rem',
                       background: !passwordForm.currentPassword || !passwordForm.newPassword ? '#E5E7EB' : 'linear-gradient(135deg, #0F2347, #1A3A6B)',
                       color: !passwordForm.currentPassword || !passwordForm.newPassword ? '#9CA3AF' : 'white',
-                      border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer'
+                      border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer',
                     }}>
                     {loading ? 'Modification...' : 'Modifier le mot de passe'}
                   </button>
@@ -277,17 +274,18 @@ export default function ProfilePage() {
               </form>
             )}
 
+            {/* Feature 5 + security info */}
             {activeTab === 'security' && (
               <div>
                 <h2 style={{ color: textMain, fontSize: '1.1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Securite du compte</h2>
-                <p style={{ color: textSub, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '2rem' }}>Informations sur la securite de votre compte</p>
+                <p style={{ color: textSub, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '2rem' }}>Informations et actions de securite</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem' }}>
                   {[
-                    { icon: '🔒', label: 'JWT Securise', desc: 'Token expire dans 15 minutes', status: 'Actif' },
-                    { icon: '🛡', label: 'bcrypt', desc: 'Mot de passe chiffre (facteur 12)', status: 'Actif' },
-                    { icon: '🔐', label: 'CORS protege', desc: 'Requetes cross-origin filtrees', status: 'Actif' },
-                    { icon: '📋', label: 'Validation donnees', desc: 'Toutes les entrees sont validees', status: 'Actif' },
+                    { icon: '🔒', label: 'JWT Securise', desc: 'Token expire dans 15 minutes' },
+                    { icon: '🛡', label: 'bcrypt', desc: 'Mot de passe chiffre (facteur 12)' },
+                    { icon: '🔐', label: 'CORS protege', desc: 'Requetes cross-origin filtrees' },
+                    { icon: '📋', label: 'Validation donnees', desc: 'Toutes les entrees sont validees' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}` }}>
                       <span style={{ fontSize: '1.4rem' }}>{item.icon}</span>
@@ -295,9 +293,23 @@ export default function ProfilePage() {
                         <div style={{ fontSize: '0.88rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.label}</div>
                         <div style={{ fontSize: '0.75rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>{item.desc}</div>
                       </div>
-                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#F0FAF4', color: '#1A7A4A', border: '1px solid #B8E4CA', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{item.status}</span>
+                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, backgroundColor: '#F0FAF4', color: '#1A7A4A', border: '1px solid #B8E4CA', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Actif</span>
                     </div>
                   ))}
+                </div>
+
+                {/* FIX: Feature 5 — logout all devices */}
+                <div style={{ padding: '1.25rem', backgroundColor: '#FDF2F2', border: '1px solid #EBCECE', borderRadius: 10, marginBottom: '1.5rem' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>
+                    ⚠ Deconnexion de tous les appareils
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                    Cette action invalidera tous vos tokens actifs et vous deconnectera de chaque appareil ou session ouverte.
+                  </div>
+                  <button onClick={handleLogoutAll}
+                    style={{ padding: '0.6rem 1.2rem', background: 'linear-gradient(135deg, #C0392B, #E74C3C)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+                    Deconnecter tous les appareils
+                  </button>
                 </div>
 
                 <div style={{ padding: '1rem', backgroundColor: dark ? '#0D1626' : '#F7F8FC', borderRadius: 10, border: `1px solid ${cardBorder}` }}>

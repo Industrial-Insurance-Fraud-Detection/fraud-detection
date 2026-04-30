@@ -9,12 +9,13 @@ import ClaimDetail from './pages/client/ClaimDetail'
 import ClaimsPage from './pages/client/ClaimsPage'
 import ProfilePage from './pages/client/ProfilePage'
 import EquipmentPage from './pages/client/Equipmentpage'
+import ClientStats from './pages/client/ClientStats'
 import InvestigatorDashboard from './pages/investigator/Dashboard'
+import FlaggedClaims from './pages/investigator/FlaggedClaims'
 import ClaimReview from './pages/investigator/ClaimReview'
 import InvestigatorHistory from './pages/investigator/InvestigatorHistory'
 import InvestigatorStats from './pages/investigator/InvestigatorStats'
 import InvestigatorProfile from './pages/investigator/InvestigatorProfile'
-import ClientStats from './pages/client/ClientStats'
 
 function App() {
   return (
@@ -36,7 +37,7 @@ function App() {
 
         {/* Investigator */}
         <Route path="/investigator/dashboard" element={<ProtectedRoute allowedRole="INVESTIGATOR"><InvestigatorDashboard /></ProtectedRoute>} />
-        <Route path="/investigator/flagged" element={<ProtectedRoute allowedRole="INVESTIGATOR"><InvestigatorDashboard /></ProtectedRoute>} />
+        <Route path="/investigator/flagged" element={<ProtectedRoute allowedRole="INVESTIGATOR"><FlaggedClaims /></ProtectedRoute>} />
         <Route path="/investigator/review/:id" element={<ProtectedRoute allowedRole="INVESTIGATOR"><ClaimReview /></ProtectedRoute>} />
         <Route path="/investigator/history" element={<ProtectedRoute allowedRole="INVESTIGATOR"><InvestigatorHistory /></ProtectedRoute>} />
         <Route path="/investigator/stats" element={<ProtectedRoute allowedRole="INVESTIGATOR"><InvestigatorStats /></ProtectedRoute>} />

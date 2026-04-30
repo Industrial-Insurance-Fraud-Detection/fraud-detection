@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth.store'
-import NotificationBell from '../ui/NotificationBell'
 import { useDarkMode } from './Sidebar'
+import api from '../../api/axios'
 
 const NAV_ITEMS = [
     { key: '/investigator/dashboard', label: 'Tableau de bord', icon: '▦' },
@@ -15,7 +15,8 @@ const NAV_ITEMS = [
 export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
     const navigate = useNavigate()
     const location = useLocation()
-    const { logout, user } = useAuthStore()
+    const { logout, refreshToken } = useAuthStore()
+    const { user } = useAuthStore()
     const [collapsed, setCollapsed] = useState(false)
 
     const active = location.pathname
@@ -26,6 +27,17 @@ export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
     const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Investigateur'
     const initial = (user?.firstName?.[0] ?? 'I').toUpperCase()
 
+    // FIX: call backend before clearing local store
+    const handleLogout = async () => {
+        try {
+            await api.post('/auth/logout', { refreshToken })
+        } catch {
+            // still clear locally if backend call fails
+        }
+        logout()
+        window.location.href = '/login'
+    }
+
     return (
         <div style={{
             width, minHeight: '100vh', backgroundColor: bg,
@@ -34,6 +46,7 @@ export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
             transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
             overflow: 'hidden', boxShadow: '4px 0 24px rgba(0,0,0,0.18)',
         }}>
+            {/* Logo */}
             <div style={{ padding: collapsed ? '1.5rem 0.75rem' : '1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 {!collapsed && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -52,6 +65,7 @@ export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
                 )}
             </div>
 
+            {/* User info */}
             {!collapsed ? (
                 <div style={{ padding: '1rem 1.5rem', borderBottom: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F2347', fontWeight: 700, flexShrink: 0 }}>{initial}</div>
@@ -66,6 +80,7 @@ export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
                 </div>
             )}
 
+            {/* Nav */}
             <nav style={{ flex: 1, padding: '0.75rem 0', overflowY: 'auto' }}>
                 {NAV_ITEMS.map(item => {
                     const isActive = active === item.key || active.startsWith(item.key + '/')
@@ -91,8 +106,9 @@ export function InvestigatorSidebar({ dark = false, badgeCount = 0 }) {
                 })}
             </nav>
 
+            {/* Logout */}
             <div style={{ padding: collapsed ? '0.75rem' : '1rem 1.5rem', borderTop: `1px solid ${border}` }}>
-                <div onClick={() => { logout(); window.location.href = '/login' }} title={collapsed ? 'Deconnexion' : ''}
+                <div onClick={handleLogout} title={collapsed ? 'Deconnexion' : ''}
                     style={{ display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '0.75rem', justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', padding: '0.4rem', borderRadius: 6 }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
