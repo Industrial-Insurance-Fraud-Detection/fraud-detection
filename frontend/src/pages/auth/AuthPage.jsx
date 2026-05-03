@@ -2,7 +2,55 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import useAuthStore from '../../store/auth.store'
+import AuthLeftPanel from './AuthLeftPanel'
 
+// ── Password strength checker ─────────────────────────────────────────────────
+function PasswordStrength({ password }) {
+  if (!password) return null
+  const checks = {
+    len: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    digit: /[0-9]/.test(password),
+  }
+  const passed = Object.values(checks).filter(Boolean).length
+  const bar = ['#E5E7EB', '#C0392B', '#E67E22', '#F39C12', '#1A7A4A']
+  const lbl = ['', 'Très faible', 'Faible', 'Moyen', 'Fort']
+  return (
+    <div style={{ marginTop: '0.55rem' }}>
+      {/* Segmented bar */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: '0.45rem' }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} style={{
+            flex: 1, height: 4, borderRadius: 3,
+            backgroundColor: i <= passed ? bar[passed] : '#F3F4F6',
+            transition: 'background-color 0.35s',
+          }} />
+        ))}
+      </div>
+      {/* Strength label */}
+      <div style={{ fontSize: '0.7rem', color: bar[passed], fontFamily: 'Helvetica Neue,Arial,sans-serif', fontWeight: 700, marginBottom: '0.45rem' }}>
+        {lbl[passed]}
+      </div>
+      {/* Checklist */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1rem' }}>
+        {[
+          [checks.len, '8 caractères min.'],
+          [checks.upper, 'Majuscule (A–Z)'],
+          [checks.lower, 'Minuscule (a–z)'],
+          [checks.digit, 'Chiffre (0–9)'],
+        ].map(([ok, txt]) => (
+          <div key={txt} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', fontFamily: 'Helvetica Neue,Arial,sans-serif', color: ok ? '#1A7A4A' : '#9CA3AF', transition: 'color 0.2s' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.7rem' }}>{ok ? '✓' : '○'}</span>
+            {txt}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function AuthPage() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
@@ -10,303 +58,269 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [registerForm, setRegisterForm] = useState({
-    firstName: '', lastName: '', company: '', email: '', password: '', confirmPassword: '',
-    phone: '', wilaya: '',
+    firstName: '', lastName: '', company: '', email: '',
+    password: '', confirmPassword: '', phone: '', wilaya: '',
   })
 
-  // ── Login ──────────────────────────────────────────────────────────────────
+  // ── Login ─────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault()
     setError(''); setSuccess('')
-    if (!loginForm.email || !loginForm.password) {
-      setError('Veuillez remplir tous les champs.'); return
-    }
+    if (!loginForm.email || !loginForm.password) { setError('Veuillez remplir tous les champs.'); return }
     setLoading(true)
     try {
-      const res = await api.post('/auth/login', {
-        email: loginForm.email,
-        password: loginForm.password,
-      })
-      const payload = res.data?.data ?? res.data
-      const { accessToken, refreshToken, user } = payload
+      const res = await api.post('/auth/login', { email: loginForm.email, password: loginForm.password })
+      const { accessToken, refreshToken, user } = res.data?.data ?? res.data
       setAuth(user, accessToken, refreshToken)
-      if (user.role === 'CLIENT') navigate('/client/dashboard')
-      else navigate('/investigator/dashboard')
+      navigate(user.role === 'CLIENT' ? '/client/dashboard' : '/investigator/dashboard')
     } catch (err) {
       const msg = err.response?.data?.message
       setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Email ou mot de passe incorrect.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
-  // ── Register ───────────────────────────────────────────────────────────────
+  // ── Register ──────────────────────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault()
     setError(''); setSuccess('')
     if (!registerForm.firstName || !registerForm.lastName || !registerForm.email || !registerForm.password) {
       setError('Veuillez remplir tous les champs obligatoires.'); return
     }
-    if (registerForm.password !== registerForm.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.'); return
-    }
-    if (registerForm.password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caracteres.'); return
-    }
+    if (registerForm.password !== registerForm.confirmPassword) { setError('Les mots de passe ne correspondent pas.'); return }
+    if (registerForm.password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères.'); return }
     setLoading(true)
     try {
       await api.post('/auth/register', {
-        firstName: registerForm.firstName,
-        lastName: registerForm.lastName,
-        company: registerForm.company || undefined,
-        email: registerForm.email,
+        firstName: registerForm.firstName, lastName: registerForm.lastName,
+        company: registerForm.company || undefined, email: registerForm.email,
         password: registerForm.password,
-        phone: registerForm.phone || undefined,
-        wilaya: registerForm.wilaya || undefined,
+        phone: registerForm.phone || undefined, wilaya: registerForm.wilaya || undefined,
       })
-      setSuccess('Compte cree avec succes ! Connectez-vous.')
+      setSuccess('Compte créé avec succès ! Connectez-vous.')
       setTab('login')
       setRegisterForm({ firstName: '', lastName: '', company: '', email: '', password: '', confirmPassword: '', phone: '', wilaya: '' })
     } catch (err) {
       const msg = err.response?.data?.message
-      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Erreur lors de la creation du compte.')
-    } finally {
-      setLoading(false)
-    }
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Erreur lors de la création du compte.')
+    } finally { setLoading(false) }
   }
 
   const switchTab = (t) => { setTab(t); setError(''); setSuccess('') }
 
-  const inputStyle = {
-    width: '100%', padding: '0.72rem 0.9rem',
-    border: '1.5px solid #E5E7EB', borderRadius: 6,
-    fontSize: '0.9rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
+  // ── Shared styles ─────────────────────────────────────────────────────────
+  const inp = {
+    width: '100%', padding: '0.75rem 1rem',
+    border: '1.5px solid #E5E7EB', borderRadius: 8,
+    fontSize: '0.88rem', fontFamily: 'Helvetica Neue,Arial,sans-serif',
     outline: 'none', backgroundColor: '#F9FAFB', boxSizing: 'border-box',
+    transition: 'border-color 0.2s, box-shadow 0.2s', color: '#0F2347',
   }
-  const labelStyle = {
-    display: 'block', fontSize: '0.74rem', fontWeight: 600,
-    textTransform: 'uppercase', letterSpacing: '0.06em',
-    color: '#4B5563', marginBottom: '0.4rem',
-    fontFamily: 'Helvetica Neue, Arial, sans-serif',
+  const lbl = {
+    display: 'block', fontSize: '0.7rem', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    color: '#6B7280', marginBottom: '0.4rem', fontFamily: 'Helvetica Neue,Arial,sans-serif',
   }
+  const onFocus = e => { e.target.style.borderColor = '#C9A84C'; e.target.style.boxShadow = '0 0 0 3px rgba(201,168,76,0.12)' }
+  const onBlur = e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'Georgia, serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'Georgia,serif' }}>
 
-      {/* ── LEFT PANEL ── */}
-      <div style={{
-        width: '45%',
-        background: 'linear-gradient(155deg, #0F2347 0%, #1A3A6B 60%, #0D1E3D 100%)',
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-        padding: '3rem', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, #C9A84C, transparent)', opacity: 0.12, transform: 'translate(30%, -30%)' }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 1 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 8, background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🛡</div>
-          <div>
-            <div style={{ color: 'white', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '0.03em' }}>FraudGuard AI</div>
-            <div style={{ color: '#C9A84C', fontSize: '0.68rem', letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 2 }}>Industrial Insurance</div>
-          </div>
-        </div>
-
-        <div style={{ zIndex: 1 }}>
-          <h1 style={{ color: 'white', fontSize: '2.4rem', fontWeight: 400, lineHeight: 1.25, marginBottom: '1.2rem' }}>
-            Detection de fraude<br />
-            <span style={{ color: '#C9A84C', fontStyle: 'italic' }}>par intelligence</span><br />
-            artificielle
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.92rem', lineHeight: 1.75, marginBottom: '2rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', maxWidth: 300 }}>
-            Analyse multimodale des sinistres industriels — donnees capteurs, photographies et rapports traites en temps reel.
-          </p>
-          <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
-            {[['4', 'Modeles IA'], ['<5m', 'Analyse complete'], ['80%+', 'Precision']].map(([v, l]) => (
-              <div key={l}>
-                <div style={{ color: '#C9A84C', fontSize: '1.8rem', fontWeight: 700, fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1 }}>{v}</div>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 4, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            {[
-              'Isolation Forest + LSTM pour anomalies capteurs',
-              'XGBoost pour classification de panne',
-              'BERT multilingue pour analyse de rapports',
-              'YOLOv8 pour detection de manipulation photo',
-            ].map((f, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#C9A84C', flexShrink: 0 }} />
-                <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{f}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem', zIndex: 1, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-          2026 FraudGuard AI — Universite M'Hamed Bougara de Boumerdes
-        </div>
-      </div>
+      <AuthLeftPanel />
 
       {/* ── RIGHT PANEL ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '3rem 4rem', backgroundColor: 'white' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2.5rem 4rem', backgroundColor: 'white', overflowY: 'auto' }}>
         <div style={{ maxWidth: 420, width: '100%', margin: '0 auto' }}>
 
-          <p style={{ fontSize: '0.72rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#9CA3AF', marginBottom: '0.4rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
+          <p style={{ fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#9CA3AF', marginBottom: '0.35rem', fontFamily: 'Helvetica Neue,Arial,sans-serif' }}>
             {tab === 'login' ? 'Bienvenue' : 'Nouveau compte'}
           </p>
-          <h2 style={{ color: '#0F2347', fontSize: '2rem', fontWeight: 400, marginBottom: '0.4rem', letterSpacing: '-0.02em' }}>
-            {tab === 'login' ? <><strong>Connexion</strong> a votre espace</> : <><strong>Inscription</strong></>}
-          </h2>
-          <p style={{ color: '#9CA3AF', fontSize: '0.86rem', marginBottom: '1.5rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', lineHeight: 1.5 }}>
+          <h2 style={{ color: '#0F2347', fontSize: '1.85rem', fontWeight: 400, marginBottom: '0.35rem', letterSpacing: '-0.02em' }}>
             {tab === 'login'
-              ? 'Acces securise a votre tableau de bord de sinistres.'
-              : 'Creez votre compte client pour soumettre et suivre vos sinistres.'}
+              ? <><strong>Connexion</strong> à votre espace</>
+              : <><strong>Créer</strong> un compte</>}
+          </h2>
+          <p style={{ color: '#9CA3AF', fontSize: '0.83rem', marginBottom: '1.5rem', fontFamily: 'Helvetica Neue,Arial,sans-serif', lineHeight: 1.55 }}>
+            {tab === 'login'
+              ? 'Accès sécurisé à votre tableau de bord sinistres.'
+              : 'Créez votre compte client pour soumettre et suivre vos sinistres.'}
           </p>
 
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '2px solid #F3F4F6', marginBottom: '1.5rem' }}>
             {[['login', 'Connexion'], ['register', 'Inscription']].map(([t, l]) => (
-              <button key={t} onClick={() => switchTab(t)}
-                style={{ padding: '0.6rem 1.5rem', fontSize: '0.86rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: tab === t ? '2px solid #0F2347' : '2px solid transparent', marginBottom: -2, color: tab === t ? '#0F2347' : '#9CA3AF', fontWeight: tab === t ? 600 : 400 }}>
-                {l}
-              </button>
+              <button key={t} onClick={() => switchTab(t)} style={{
+                padding: '0.55rem 1.4rem', fontSize: '0.85rem',
+                fontFamily: 'Helvetica Neue,Arial,sans-serif',
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                borderBottom: tab === t ? '2px solid #C9A84C' : '2px solid transparent',
+                marginBottom: -2, color: tab === t ? '#0F2347' : '#9CA3AF',
+                fontWeight: tab === t ? 600 : 400, transition: 'all 0.2s',
+              }}>{l}</button>
             ))}
           </div>
 
-          {error && <div style={{ backgroundColor: '#FDF2F2', border: '1px solid #EBCECE', borderRadius: 6, padding: '0.7rem 0.9rem', color: '#C0392B', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>⚠ {error}</div>}
-          {success && <div style={{ backgroundColor: '#F0FAF4', border: '1px solid #B8E4CA', borderRadius: 6, padding: '0.7rem 0.9rem', color: '#1A7A4A', fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '1rem' }}>✓ {success}</div>}
+          {/* Alerts */}
+          {error && (
+            <div style={{ backgroundColor: '#FDF2F2', border: '1px solid #EBCECE', borderRadius: 8, padding: '0.65rem 0.9rem', color: '#C0392B', fontSize: '0.81rem', fontFamily: 'Helvetica Neue,Arial,sans-serif', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <span style={{ flexShrink: 0 }}>⚠</span> {error}
+            </div>
+          )}
+          {success && (
+            <div style={{ backgroundColor: '#F0FAF4', border: '1px solid #B8E4CA', borderRadius: 8, padding: '0.65rem 0.9rem', color: '#1A7A4A', fontSize: '0.81rem', fontFamily: 'Helvetica Neue,Arial,sans-serif', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <span style={{ flexShrink: 0 }}>✓</span> {success}
+            </div>
+          )}
 
-          {/* ── LOGIN FORM ── */}
+          {/* ── LOGIN ── */}
           {tab === 'login' && (
             <form onSubmit={handleLogin}>
-              {[
-                { label: 'Adresse email', name: 'email', type: 'email', placeholder: 'votre@email.com' },
-                { label: 'Mot de passe', name: 'password', type: 'password', placeholder: '••••••••' },
-              ].map(f => (
-                <div key={f.name} style={{ marginBottom: '1rem' }}>
-                  <label style={labelStyle}>{f.label}</label>
-                  <input
-                    type={f.type} placeholder={f.placeholder}
-                    value={loginForm[f.name]}
-                    onChange={e => setLoginForm({ ...loginForm, [f.name]: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'}
-                  />
-                </div>
-              ))}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={lbl}>Adresse email</label>
+                <input type="email" placeholder="votre@email.com" value={loginForm.email}
+                  onChange={e => setLoginForm({ ...loginForm, email: e.target.value })}
+                  style={inp} onFocus={onFocus} onBlur={onBlur} />
+              </div>
 
-              {/* Forgot password link */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem', marginTop: '-0.5rem' }}>
-                <span onClick={() => navigate('/forgot-password')}
-                  style={{ fontSize: '0.78rem', color: '#0F2347', cursor: 'pointer', fontFamily: 'Helvetica Neue, Arial, sans-serif', textDecoration: 'underline' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                <label style={lbl}>Mot de passe</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPass ? 'text' : 'password'} placeholder="••••••••" value={loginForm.password}
+                    onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                    style={{ ...inp, paddingRight: '2.8rem' }} onFocus={onFocus} onBlur={onBlur} />
+                  <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, fontSize: '1rem' }}>
+                    {showPass ? '🙈' : '👁'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
+                <span onClick={() => navigate('/forgot-password')} style={{ fontSize: '0.76rem', color: '#C9A84C', cursor: 'pointer', fontFamily: 'Helvetica Neue,Arial,sans-serif', fontWeight: 600 }}>
                   Mot de passe oublié ?
                 </span>
               </div>
 
-              <button type="submit" disabled={loading}
-                style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.86rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 15px rgba(15,35,71,0.25)' }}>
-                {loading ? 'Connexion en cours...' : 'Se connecter'}
+              <button type="submit" disabled={loading} style={{
+                width: '100%', padding: '0.82rem',
+                background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #0F2347 0%, #1A3A6B 100%)',
+                color: 'white', border: 'none', borderRadius: 8,
+                fontSize: '0.86rem', fontFamily: 'Helvetica Neue,Arial,sans-serif',
+                fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: loading ? 'none' : '0 4px 18px rgba(15,35,71,0.28)',
+                transition: 'all 0.2s',
+              }}>
+                {loading ? 'Connexion…' : 'Se connecter →'}
               </button>
-
-              <div style={{ marginTop: '1rem', padding: '0.6rem 0.85rem', backgroundColor: '#EBF5FB', border: '1px solid #AED6F1', borderRadius: 6, fontSize: '0.75rem', color: '#1A5276', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-                ℹ Les comptes investigateurs sont crees par l'administrateur.
-              </div>
             </form>
           )}
 
-          {/* ── REGISTER FORM ── */}
+          {/* ── REGISTER ── */}
           {tab === 'register' && (
             <form onSubmit={handleRegister}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
-                <div>
-                  <label style={labelStyle}>Prenom *</label>
-                  <input type="text" placeholder="Votre prenom" value={registerForm.firstName}
-                    onChange={e => setRegisterForm({ ...registerForm, firstName: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Nom *</label>
-                  <input type="text" placeholder="Votre nom" value={registerForm.lastName}
-                    onChange={e => setRegisterForm({ ...registerForm, lastName: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', marginBottom: '0.75rem' }}>
+                {[['firstName', 'Prénom *', 'Votre prénom'], ['lastName', 'Nom *', 'Votre nom']].map(([k, l, p]) => (
+                  <div key={k}>
+                    <label style={lbl}>{l}</label>
+                    <input type="text" placeholder={p} value={registerForm[k]}
+                      onChange={e => setRegisterForm({ ...registerForm, [k]: e.target.value })}
+                      style={inp} onFocus={onFocus} onBlur={onBlur} />
+                  </div>
+                ))}
               </div>
 
-              {[
-                { label: 'Entreprise', name: 'company', type: 'text', placeholder: "Nom de votre entreprise (optionnel)" },
-                { label: 'Adresse email *', name: 'email', type: 'email', placeholder: 'votre@email.com' },
-              ].map(f => (
-                <div key={f.name} style={{ marginBottom: '0.8rem' }}>
-                  <label style={labelStyle}>{f.label}</label>
-                  <input type={f.type} placeholder={f.placeholder} value={registerForm[f.name]}
-                    onChange={e => setRegisterForm({ ...registerForm, [f.name]: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
-                </div>
-              ))}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={lbl}>Entreprise</label>
+                <input type="text" placeholder="Nom de votre entreprise (optionnel)" value={registerForm.company}
+                  onChange={e => setRegisterForm({ ...registerForm, company: e.target.value })}
+                  style={inp} onFocus={onFocus} onBlur={onBlur} />
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.8rem' }}>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={lbl}>Adresse email *</label>
+                <input type="email" placeholder="votre@email.com" value={registerForm.email}
+                  onChange={e => setRegisterForm({ ...registerForm, email: e.target.value })}
+                  style={inp} onFocus={onFocus} onBlur={onBlur} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', marginBottom: '0.75rem' }}>
                 <div>
-                  <label style={labelStyle}>Téléphone</label>
+                  <label style={lbl}>Téléphone</label>
                   <input type="tel" placeholder="0550000001" value={registerForm.phone}
                     onChange={e => setRegisterForm({ ...registerForm, phone: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                    style={inp} onFocus={onFocus} onBlur={onBlur} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Wilaya</label>
+                  <label style={lbl}>Wilaya</label>
                   <input type="text" placeholder="Ex: Boumerdès" value={registerForm.wilaya}
                     onChange={e => setRegisterForm({ ...registerForm, wilaya: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+                    style={inp} onFocus={onFocus} onBlur={onBlur} />
                 </div>
               </div>
 
-              {[
-                { label: 'Mot de passe * (maj + min + chiffre)', name: 'password', type: 'password', placeholder: 'Ex: MonMotDePasse1' },
-                { label: 'Confirmer le mot de passe *', name: 'confirmPassword', type: 'password', placeholder: 'Repetez le mot de passe' },
-              ].map(f => (
-                <div key={f.name} style={{ marginBottom: '0.8rem' }}>
-                  <label style={labelStyle}>{f.label}</label>
-                  <input type={f.type} placeholder={f.placeholder} value={registerForm[f.name]}
-                    onChange={e => setRegisterForm({ ...registerForm, [f.name]: e.target.value })}
-                    style={inputStyle}
-                    onFocus={e => e.target.style.borderColor = '#0F2347'}
-                    onBlur={e => e.target.style.borderColor = '#E5E7EB'} />
+              {/* Password with strength */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={lbl}>Mot de passe *</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showPass ? 'text' : 'password'} placeholder="Créez un mot de passe sécurisé" value={registerForm.password}
+                    onChange={e => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    style={{ ...inp, paddingRight: '2.8rem' }} onFocus={onFocus} onBlur={onBlur} />
+                  <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, fontSize: '1rem' }}>
+                    {showPass ? '🙈' : '👁'}
+                  </button>
                 </div>
-              ))}
+                <PasswordStrength password={registerForm.password} />
+              </div>
 
-              <button type="submit" disabled={loading}
-                style={{ width: '100%', padding: '0.85rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 6, fontSize: '0.86rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, boxShadow: '0 4px 15px rgba(15,35,71,0.25)' }}>
-                {loading ? 'Creation du compte...' : 'Creer mon compte client'}
+              {/* Confirm password */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={lbl}>Confirmer le mot de passe *</label>
+                <div style={{ position: 'relative' }}>
+                  <input type={showConfirm ? 'text' : 'password'} placeholder="Répétez le mot de passe"
+                    value={registerForm.confirmPassword}
+                    onChange={e => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                    style={{
+                      ...inp, paddingRight: '2.8rem',
+                      borderColor: registerForm.confirmPassword && registerForm.confirmPassword !== registerForm.password ? '#C0392B' : '#E5E7EB',
+                    }}
+                    onFocus={onFocus} onBlur={onBlur} />
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, fontSize: '1rem' }}>
+                    {showConfirm ? '🙈' : '👁'}
+                  </button>
+                </div>
+                {registerForm.confirmPassword && registerForm.confirmPassword !== registerForm.password && (
+                  <div style={{ fontSize: '0.68rem', color: '#C0392B', fontFamily: 'Helvetica Neue,Arial,sans-serif', marginTop: '0.25rem' }}>✗ Les mots de passe ne correspondent pas</div>
+                )}
+                {registerForm.confirmPassword && registerForm.confirmPassword === registerForm.password && (
+                  <div style={{ fontSize: '0.68rem', color: '#1A7A4A', fontFamily: 'Helvetica Neue,Arial,sans-serif', marginTop: '0.25rem' }}>✓ Les mots de passe correspondent</div>
+                )}
+              </div>
+
+              <button type="submit" disabled={loading} style={{
+                width: '100%', padding: '0.82rem',
+                background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #0F2347 0%, #1A3A6B 100%)',
+                color: 'white', border: 'none', borderRadius: 8,
+                fontSize: '0.86rem', fontFamily: 'Helvetica Neue,Arial,sans-serif',
+                fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: loading ? 'none' : '0 4px 18px rgba(15,35,71,0.28)',
+              }}>
+                {loading ? 'Création du compte…' : 'Créer mon compte →'}
               </button>
             </form>
           )}
 
-          <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
-            {tab === 'login' ? 'Pas encore de compte ? ' : 'Deja un compte ? '}
-            <span onClick={() => switchTab(tab === 'login' ? 'register' : 'login')}
-              style={{ color: '#0F2347', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+          <p style={{ textAlign: 'center', marginTop: '1.1rem', fontSize: '0.79rem', color: '#9CA3AF', fontFamily: 'Helvetica Neue,Arial,sans-serif' }}>
+            {tab === 'login' ? 'Pas encore de compte ? ' : 'Déjà un compte ? '}
+            <span onClick={() => switchTab(tab === 'login' ? 'register' : 'login')} style={{ color: '#C9A84C', fontWeight: 600, cursor: 'pointer' }}>
               {tab === 'login' ? "S'inscrire" : 'Se connecter'}
             </span>
           </p>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #F3F4F6' }}>
-            {['JWT Securise', 'HTTPS', 'bcrypt'].map(label => (
-              <div key={label} style={{ color: '#9CA3AF', fontSize: '0.72rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{label}</div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
