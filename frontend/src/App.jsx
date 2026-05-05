@@ -16,11 +16,13 @@ import ClaimReview from './pages/investigator/ClaimReview'
 import InvestigatorHistory from './pages/investigator/InvestigatorHistory'
 import InvestigatorStats from './pages/investigator/InvestigatorStats'
 import InvestigatorProfile from './pages/investigator/InvestigatorProfile'
+import LandingPage from './pages/LandingPage'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         {/* Auth */}
         <Route path="/login" element={<AuthPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
