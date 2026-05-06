@@ -4,17 +4,6 @@ import api from '../../api/axios'
 import Sidebar, { useDarkMode } from '../../components/layout/Sidebar'
 import NotificationBell from '../../components/ui/NotificationBell'
 
-/**
- * ClaimsPage
- *
- * GET /claims/my  →  { success, data: { data: Claim[], pagination } }
- *
- * Per claim:
- *   claim.claimedAmount         (not amount)
- *   claim.equipment?.name       (object, not string)
- *   claim.analysis?.finalScore  (nested, not claim.finalScore)
- */
-
 const STATUS_CONFIG = {
   APPROVED: { label: 'Approuvé', bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA' },
   REJECTED: { label: 'Rejeté', bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE' },
@@ -60,6 +49,8 @@ export default function ClaimsPage() {
   const textSub = dark ? '#5A7A9A' : '#9CA3AF'
   const textBody = dark ? '#C8D8E8' : '#4B5563'
   const rowHover = dark ? '#172338' : '#F9FAFB'
+  const gold = '#C9A84C'
+  const navy = '#0F2347'
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif', transition: 'background 0.3s' }}>
@@ -76,12 +67,24 @@ export default function ClaimsPage() {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <NotificationBell dark={dark} />
-            <button onClick={toggleDark}
-              style={{ padding: '0.55rem 1rem', border: `1.5px solid ${cardBorder}`, borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: cardBg, color: textSub }}>
-              {dark ? '☀ Mode clair' : '🌙 Mode sombre'}
+            <button
+              onClick={toggleDark}
+              style={{
+                background: 'none',
+                border: `1px solid ${dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'}`,
+                borderRadius: 7, padding: '0.4rem 0.85rem', cursor: 'pointer',
+                color: dark ? 'rgba(201,168,76,0.9)' : textSub,
+                fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
+                transition: 'border-color 0.2s, color 0.2s',
+                backgroundColor: dark ? 'rgba(201,168,76,0.06)' : 'transparent',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = gold; e.currentTarget.style.color = gold }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'; e.currentTarget.style.color = dark ? 'rgba(201,168,76,0.9)' : textSub }}
+            >
+              {dark ? 'Mode clair' : 'Mode sombre'}
             </button>
             <button onClick={() => navigate('/client/new-claim')}
-              style={{ padding: '0.7rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '0.7rem 1.5rem', background: `linear-gradient(135deg, ${navy}, #1A3A6B)`, color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
               + Nouveau sinistre
             </button>
           </div>
@@ -97,7 +100,7 @@ export default function ClaimsPage() {
           />
           {[['ALL', 'Tous'], ['APPROVED', 'Approuvés'], ['REJECTED', 'Rejetés'], ['HUMAN_REVIEW', 'Révision'], ['ANALYZING', 'En analyse'], ['PENDING', 'En attente']].map(([f, l]) => (
             <button key={f} onClick={() => setFilterStatus(f)}
-              style={{ padding: '0.4rem 0.85rem', border: `1.5px solid ${filterStatus === f ? '#0F2347' : cardBorder}`, borderRadius: 6, fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: filterStatus === f ? '#0F2347' : cardBg, color: filterStatus === f ? 'white' : textSub, fontWeight: filterStatus === f ? 600 : 400 }}>
+              style={{ padding: '0.4rem 0.85rem', border: `1.5px solid ${filterStatus === f ? navy : cardBorder}`, borderRadius: 6, fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: filterStatus === f ? navy : cardBg, color: filterStatus === f ? 'white' : textSub, fontWeight: filterStatus === f ? 600 : 400 }}>
               {l}
             </button>
           ))}
@@ -131,15 +134,13 @@ export default function ClaimsPage() {
                 onMouseEnter={e => { e.currentTarget.style.backgroundColor = rowHover; e.currentTarget.style.transform = 'translateX(4px)' }}
                 onMouseLeave={e => { e.currentTarget.style.backgroundColor = cardBg; e.currentTarget.style.transform = 'translateX(0)' }}
               >
-                {/* Reference + date */}
                 <div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{claim.reference}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: gold, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{claim.reference}</div>
                   <div style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>
                     {new Date(claim.incidentDate).toLocaleDateString('fr-FR')}
                   </div>
                 </div>
 
-                {/* Equipment object */}
                 <div>
                   <div style={{ fontSize: '0.88rem', color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 500 }}>
                     {claim.equipment?.name || '—'}
@@ -151,24 +152,20 @@ export default function ClaimsPage() {
                   )}
                 </div>
 
-                {/* claimedAmount */}
                 <div style={{ fontSize: '0.85rem', fontWeight: 600, color: textBody, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                   {claim.claimedAmount != null ? claim.claimedAmount.toLocaleString('fr-FR') + ' DA' : '—'}
                 </div>
 
-                {/* Decision outcome if exists */}
                 <div style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                   {claim.decision?.outcome || '—'}
                 </div>
 
-                {/* Status */}
                 <div>
                   <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
                     {sc.label}
                   </span>
                 </div>
 
-                {/* Score bar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {score != null ? (
                     <>
@@ -184,7 +181,6 @@ export default function ClaimsPage() {
                   )}
                 </div>
 
-                {/* Arrow */}
                 <div style={{ textAlign: 'right', color: textSub, fontSize: '0.9rem' }}>→</div>
               </div>
             )

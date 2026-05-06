@@ -4,29 +4,6 @@ import api from '../../api/axios'
 import Sidebar, { useDarkMode } from '../../components/layout/Sidebar'
 import NotificationBell from '../../components/ui/NotificationBell'
 
-/**
- * EquipmentPage — CLIENT only
- *
- * Covers items 12–16:
- *   POST   /equipment            → register new machine
- *   GET    /equipment            → paginated list with search + type filter
- *   GET    /equipment/:id        → full details + last 5 claims
- *   PATCH  /equipment/:id        → edit name, location, manufacturer, model, dates
- *   DELETE /equipment/:id        → soft delete (isActive = false)
- *
- * Backend shape:
- *   equipment.name, .type, .manufacturer, .model, .serialNumber
- *   equipment.commissionDate, .lastMaintenanceDate, .location, .isActive
- *   equipment._count.claims
- *   equipment.claims[]   (on detail view)
- *
- * Route in App.jsx to add:
- *   <Route path="/client/equipment" element={<ProtectedRoute allowedRole="CLIENT"><EquipmentPage /></ProtectedRoute>} />
- *
- * Also add to Sidebar CLIENT_ITEMS:
- *   { key: '/client/equipment', label: 'Mes équipements', icon: '⚙' }
- */
-
 const EQUIPMENT_TYPES = [
     'Pompe Industrielle',
     'Compresseur',
@@ -53,8 +30,6 @@ const CLAIM_STATUS_CONFIG = {
     HUMAN_REVIEW: { label: 'Révision', color: '#1A5276', bg: '#EBF5FB' },
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function extractEquipment(responseData) {
     const inner = responseData?.data ?? responseData
     const arr = inner?.data ?? inner
@@ -64,8 +39,6 @@ function extractEquipment(responseData) {
 function today() {
     return new Date().toISOString().split('T')[0]
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Modal({ open, title, onClose, children, dark }) {
     if (!open) return null
@@ -106,6 +79,7 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
     const textSub = dark ? '#5A7A9A' : '#9CA3AF'
     const inputBg = dark ? '#0D1626' : '#F9FAFB'
     const inputBorder = dark ? '#1E2D45' : '#E5E7EB'
+    const gold = '#C9A84C'
     const isEdit = !!initial
 
     const inputStyle = {
@@ -135,15 +109,13 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
                 </div>
             )}
 
-            {/* Name */}
             <div style={{ marginBottom: '0.85rem' }}>
                 <label style={labelStyle}>Nom de l'équipement *</label>
                 <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                     style={inputStyle} placeholder="Ex: Compresseur Atlas Copco GA-55" required
-                    onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                    onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
             </div>
 
-            {/* Type — locked on edit */}
             <div style={{ marginBottom: '0.85rem' }}>
                 <label style={labelStyle}>Type d'équipement *</label>
                 {isEdit ? (
@@ -154,30 +126,28 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
                 ) : (
                     <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
                         style={inputStyle} required
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder}>
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder}>
                         <option value="">Sélectionnez un type</option>
                         {EQUIPMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 )}
             </div>
 
-            {/* Manufacturer + Model */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
                 <div>
                     <label style={labelStyle}>Fabricant</label>
                     <input value={form.manufacturer} onChange={e => setForm({ ...form, manufacturer: e.target.value })}
                         style={inputStyle} placeholder="Ex: Atlas Copco"
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
                 </div>
                 <div>
                     <label style={labelStyle}>Modèle</label>
                     <input value={form.model} onChange={e => setForm({ ...form, model: e.target.value })}
                         style={inputStyle} placeholder="Ex: GA-55"
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
                 </div>
             </div>
 
-            {/* Serial number — locked on edit */}
             <div style={{ marginBottom: '0.85rem' }}>
                 <label style={labelStyle}>Numéro de série *</label>
                 {isEdit ? (
@@ -189,11 +159,10 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
                         style={inputStyle} placeholder="Ex: AC-GA55-2019-001" required
                         pattern="[A-Z0-9\-]+"
                         title="Majuscules, chiffres et tirets uniquement"
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
                 )}
             </div>
 
-            {/* Commission date + Last maintenance */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.85rem' }}>
                 <div>
                     <label style={labelStyle}>Date de mise en service *</label>
@@ -201,7 +170,7 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
                         max={today()}
                         onChange={e => setForm({ ...form, commissionDate: e.target.value })}
                         style={inputStyle} required
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
                 </div>
                 <div>
                     <label style={labelStyle}>Dernière maintenance</label>
@@ -209,16 +178,15 @@ function EquipmentForm({ initial, onSubmit, loading, error, dark, submitLabel })
                         max={today()}
                         onChange={e => setForm({ ...form, lastMaintenanceDate: e.target.value })}
                         style={inputStyle}
-                        onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                        onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
                 </div>
             </div>
 
-            {/* Location */}
             <div style={{ marginBottom: '1.25rem' }}>
                 <label style={labelStyle}>Emplacement</label>
                 <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}
                     style={inputStyle} placeholder="Ex: Usine Boumerdès — Bâtiment B2"
-                    onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = inputBorder} />
+                    onFocus={e => e.target.style.borderColor = gold} onBlur={e => e.target.style.borderColor = inputBorder} />
             </div>
 
             <button type="submit" disabled={loading}
@@ -240,7 +208,6 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
 
     return (
         <div>
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ width: 56, height: 56, borderRadius: 12, background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', flexShrink: 0 }}>
                     {icon}
@@ -256,7 +223,6 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
                 </div>
             </div>
 
-            {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 {[
                     ['Numéro de série', equipment.serialNumber || '—'],
@@ -273,7 +239,6 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
                 ))}
             </div>
 
-            {/* Location */}
             {equipment.location && (
                 <div style={{ backgroundColor: cardBg, borderRadius: 8, padding: '0.75rem', border: `1px solid ${cardBorder}`, marginBottom: '1.25rem' }}>
                     <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.2rem' }}>Emplacement</div>
@@ -281,7 +246,6 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
                 </div>
             )}
 
-            {/* Last 5 claims */}
             {equipment.claims && equipment.claims.length > 0 && (
                 <div style={{ marginBottom: '1.25rem' }}>
                     <div style={{ fontSize: '0.8rem', fontWeight: 600, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.6rem' }}>
@@ -311,7 +275,6 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
                 </div>
             )}
 
-            {/* Actions */}
             <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1rem', borderTop: `1px solid ${cardBorder}` }}>
                 <button onClick={onEdit}
                     style={{ flex: 1, padding: '0.7rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.84rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer' }}>
@@ -328,13 +291,10 @@ function EquipmentDetailPanel({ equipment, onClose, onEdit, onDeactivate, dark }
     )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function EquipmentPage() {
     const navigate = useNavigate()
     const [dark, toggleDark] = useDarkMode()
 
-    // List state
     const [equipment, setEquipment] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -342,18 +302,15 @@ export default function EquipmentPage() {
     const [page, setPage] = useState(1)
     const [pagination, setPagination] = useState(null)
 
-    // Modal state
     const [showAdd, setShowAdd] = useState(false)
-    const [showDetail, setShowDetail] = useState(null)   // equipment object
-    const [showEdit, setShowEdit] = useState(null)   // equipment object
+    const [showDetail, setShowDetail] = useState(null)
+    const [showEdit, setShowEdit] = useState(null)
     const [showConfirmDeactivate, setShowConfirmDeactivate] = useState(null)
 
-    // Form state
     const [formLoading, setFormLoading] = useState(false)
     const [formError, setFormError] = useState('')
     const [detailLoading, setDetailLoading] = useState(false)
 
-    // ── Fetch list ─────────────────────────────────────────────────────────────
     const fetchEquipment = async () => {
         setLoading(true)
         try {
@@ -373,25 +330,22 @@ export default function EquipmentPage() {
 
     useEffect(() => { fetchEquipment() }, [page, typeFilter])
 
-    // Debounce search
     useEffect(() => {
         const t = setTimeout(() => { setPage(1); fetchEquipment() }, 350)
         return () => clearTimeout(t)
     }, [search])
 
-    // ── Load full detail (with claims) ─────────────────────────────────────────
     const openDetail = async (eq) => {
         setDetailLoading(true)
-        setShowDetail(eq) // show stub immediately
+        setShowDetail(eq)
         try {
             const res = await api.get(`/equipment/${eq.id}`)
             const data = res.data?.data ?? res.data
             setShowDetail(data)
-        } catch { /* keep stub */ }
+        } catch { }
         finally { setDetailLoading(false) }
     }
 
-    // ── Register ───────────────────────────────────────────────────────────────
     const handleCreate = async (form) => {
         setFormError('')
         setFormLoading(true)
@@ -403,12 +357,9 @@ export default function EquipmentPage() {
         } catch (err) {
             const msg = err.response?.data?.message
             setFormError(Array.isArray(msg) ? msg.join(', ') : msg || 'Erreur lors de l\'enregistrement')
-        } finally {
-            setFormLoading(false)
-        }
+        } finally { setFormLoading(false) }
     }
 
-    // ── Update ─────────────────────────────────────────────────────────────────
     const handleUpdate = async (form) => {
         setFormError('')
         setFormLoading(true)
@@ -420,37 +371,32 @@ export default function EquipmentPage() {
             if (form.location) patch.location = form.location
             if (form.commissionDate) patch.commissionDate = form.commissionDate
             if (form.lastMaintenanceDate) patch.lastMaintenanceDate = form.lastMaintenanceDate
-
             await api.patch(`/equipment/${showEdit.id}`, patch)
             setShowEdit(null)
             await fetchEquipment()
         } catch (err) {
             const msg = err.response?.data?.message
             setFormError(Array.isArray(msg) ? msg.join(', ') : msg || 'Erreur lors de la mise à jour')
-        } finally {
-            setFormLoading(false)
-        }
+        } finally { setFormLoading(false) }
     }
 
-    // ── Deactivate ─────────────────────────────────────────────────────────────
     const handleDeactivate = async (id) => {
         try {
             await api.delete(`/equipment/${id}`)
             setShowConfirmDeactivate(null)
             setShowDetail(null)
             await fetchEquipment()
-        } catch (err) {
-            console.error('Deactivate error:', err)
-        }
+        } catch (err) { console.error('Deactivate error:', err) }
     }
 
-    // ── Colors ─────────────────────────────────────────────────────────────────
     const pageBg = dark ? '#0D1626' : '#F7F8FC'
     const cardBg = dark ? '#111C30' : 'white'
     const cardBorder = dark ? '#1E2D45' : '#EEF0F6'
     const textMain = dark ? 'white' : '#0F2347'
     const textSub = dark ? '#5A7A9A' : '#9CA3AF'
     const rowHover = dark ? '#172338' : '#F9FAFB'
+    const gold = '#C9A84C'
+    const navy = '#0F2347'
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif', transition: 'background 0.3s' }}>
@@ -469,12 +415,24 @@ export default function EquipmentPage() {
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <NotificationBell dark={dark} />
-                        <button onClick={toggleDark}
-                            style={{ padding: '0.55rem 1rem', border: `1.5px solid ${cardBorder}`, borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: cardBg, color: textSub }}>
-                            {dark ? '☀ Mode clair' : '🌙 Mode sombre'}
+                        <button
+                            onClick={toggleDark}
+                            style={{
+                                background: 'none',
+                                border: `1px solid ${dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'}`,
+                                borderRadius: 7, padding: '0.4rem 0.85rem', cursor: 'pointer',
+                                color: dark ? 'rgba(201,168,76,0.9)' : textSub,
+                                fontSize: '0.78rem', fontFamily: 'Helvetica Neue, Arial, sans-serif',
+                                transition: 'border-color 0.2s, color 0.2s',
+                                backgroundColor: dark ? 'rgba(201,168,76,0.06)' : 'transparent',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = gold; e.currentTarget.style.color = gold }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'; e.currentTarget.style.color = dark ? 'rgba(201,168,76,0.9)' : textSub }}
+                        >
+                            {dark ? 'Mode clair' : 'Mode sombre'}
                         </button>
                         <button onClick={() => { setFormError(''); setShowAdd(true) }}
-                            style={{ padding: '0.7rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 15px rgba(15,35,71,0.25)' }}>
+                            style={{ padding: '0.7rem 1.5rem', background: `linear-gradient(135deg, ${navy}, #1A3A6B)`, color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 15px rgba(15,35,71,0.25)' }}>
                             + Nouveau équipement
                         </button>
                     </div>
@@ -509,7 +467,7 @@ export default function EquipmentPage() {
                         </div>
                         {!search && !typeFilter && (
                             <button onClick={() => { setFormError(''); setShowAdd(true) }}
-                                style={{ padding: '0.65rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: 600 }}>
+                                style={{ padding: '0.65rem 1.5rem', background: `linear-gradient(135deg, ${navy}, #1A3A6B)`, color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: 600 }}>
                                 + Ajouter un équipement
                             </button>
                         )}
@@ -526,25 +484,22 @@ export default function EquipmentPage() {
                                     onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = dark ? '0 8px 24px rgba(0,0,0,0.3)' : '0 8px 24px rgba(15,35,71,0.1)' }}
                                     onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
 
-                                    {/* Inactive badge */}
                                     {!eq.isActive && (
                                         <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: 20, fontSize: '0.62rem', fontWeight: 600, backgroundColor: '#FDF2F2', color: '#C0392B', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                                             Désactivé
                                         </div>
                                     )}
 
-                                    {/* Icon + name */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                                        <div style={{ width: 44, height: 44, borderRadius: 10, background: eq.isActive ? 'linear-gradient(135deg, #0F2347, #1A3A6B)' : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>
+                                        <div style={{ width: 44, height: 44, borderRadius: 10, background: eq.isActive ? `linear-gradient(135deg, ${navy}, #1A3A6B)` : '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>
                                             {icon}
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontSize: '0.9rem', fontWeight: 700, color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{eq.name}</div>
-                                            <div style={{ fontSize: '0.72rem', color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>{eq.type}</div>
+                                            <div style={{ fontSize: '0.72rem', color: gold, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: 2 }}>{eq.type}</div>
                                         </div>
                                     </div>
 
-                                    {/* Details */}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.75rem' }}>
                                         {eq.serialNumber && (
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
@@ -567,12 +522,11 @@ export default function EquipmentPage() {
                                         )}
                                     </div>
 
-                                    {/* Footer */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: `1px solid ${cardBorder}` }}>
                                         <div style={{ fontSize: '0.68rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                                             {eq.commissionDate ? `Depuis ${new Date(eq.commissionDate).getFullYear()}` : ''}
                                         </div>
-                                        <div style={{ fontSize: '0.78rem', color: dark ? '#5A7A9A' : '#9CA3AF', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Voir détails →</div>
+                                        <div style={{ fontSize: '0.78rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Voir détails →</div>
                                     </div>
                                 </div>
                             )
@@ -585,7 +539,7 @@ export default function EquipmentPage() {
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
                         {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(p => (
                             <button key={p} onClick={() => setPage(p)}
-                                style={{ width: 36, height: 36, borderRadius: 8, border: `1.5px solid ${p === page ? '#0F2347' : cardBorder}`, background: p === page ? '#0F2347' : cardBg, color: p === page ? 'white' : textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: p === page ? 700 : 400 }}>
+                                style={{ width: 36, height: 36, borderRadius: 8, border: `1.5px solid ${p === page ? navy : cardBorder}`, background: p === page ? navy : cardBg, color: p === page ? 'white' : textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: p === page ? 700 : 400 }}>
                                 {p}
                             </button>
                         ))}
@@ -593,18 +547,11 @@ export default function EquipmentPage() {
                 )}
             </div>
 
-            {/* ── Modal: Add equipment ── */}
+            {/* ── Modals ── */}
             <Modal open={showAdd} title="Enregistrer un équipement" onClose={() => setShowAdd(false)} dark={dark}>
-                <EquipmentForm
-                    onSubmit={handleCreate}
-                    loading={formLoading}
-                    error={formError}
-                    dark={dark}
-                    submitLabel="Enregistrer l'équipement"
-                />
+                <EquipmentForm onSubmit={handleCreate} loading={formLoading} error={formError} dark={dark} submitLabel="Enregistrer l'équipement" />
             </Modal>
 
-            {/* ── Modal: Equipment detail ── */}
             <Modal open={!!showDetail} title="Détails de l'équipement" onClose={() => setShowDetail(null)} dark={dark}>
                 {showDetail && (
                     detailLoading
@@ -621,21 +568,12 @@ export default function EquipmentPage() {
                 )}
             </Modal>
 
-            {/* ── Modal: Edit equipment ── */}
             <Modal open={!!showEdit} title="Modifier l'équipement" onClose={() => setShowEdit(null)} dark={dark}>
                 {showEdit && (
-                    <EquipmentForm
-                        initial={showEdit}
-                        onSubmit={handleUpdate}
-                        loading={formLoading}
-                        error={formError}
-                        dark={dark}
-                        submitLabel="Enregistrer les modifications"
-                    />
+                    <EquipmentForm initial={showEdit} onSubmit={handleUpdate} loading={formLoading} error={formError} dark={dark} submitLabel="Enregistrer les modifications" />
                 )}
             </Modal>
 
-            {/* ── Modal: Confirm deactivate ── */}
             <Modal open={!!showConfirmDeactivate} title="Désactiver l'équipement" onClose={() => setShowConfirmDeactivate(null)} dark={dark}>
                 {showConfirmDeactivate && (
                     <div>

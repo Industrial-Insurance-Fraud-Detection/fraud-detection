@@ -5,22 +5,6 @@ import api from '../../api/axios'
 import Sidebar, { useDarkMode } from '../../components/layout/Sidebar'
 import NotificationBell from '../../components/ui/NotificationBell'
 
-/**
- * ClientDashboard
- *
- * Backend response chain:
- *   GET /claims/my
- *   → TransformInterceptor wraps: { success: true, data: <paginate result> }
- *   → paginate() returns: { data: Claim[], pagination: {...} }
- *   So full shape: { success, data: { data: Claim[], pagination } }
- *
- * On each Claim:
- *   - claimedAmount     (not amount)
- *   - equipment         object { name, type }  (not a string)
- *   - analysis          object | null  { finalScore, fraudClass, ... }
- *   - decision          object | null
- */
-
 const STATUS_CONFIG = {
   APPROVED: { label: 'Approuvé', bg: '#F0FAF4', color: '#1A7A4A', border: '#B8E4CA', darkBg: '#0D2B1A' },
   REJECTED: { label: 'Rejeté', bg: '#FDF2F2', color: '#C0392B', border: '#EBCECE', darkBg: '#2B0D0D' },
@@ -29,17 +13,9 @@ const STATUS_CONFIG = {
   HUMAN_REVIEW: { label: 'Révision humaine', bg: '#EBF5FB', color: '#1A5276', border: '#AED6F1', darkBg: '#0D1E2B' },
 }
 
-/**
- * Unwrap the nested paginated response.
- * Handles all the shapes the axios interceptor + TransformInterceptor can produce:
- *   res.data                          → { success, data: { data: [], pagination } }
- *   res.data.data                     → { data: [], pagination }
- *   res.data.data.data                → []
- */
 function extractClaims(responseData) {
-  // responseData = res.data (after axios)
-  const inner = responseData?.data ?? responseData          // strip TransformInterceptor wrapper
-  const arr = inner?.data ?? inner                        // strip paginate() wrapper
+  const inner = responseData?.data ?? responseData
+  const arr = inner?.data ?? inner
   return Array.isArray(arr) ? arr : []
 }
 
@@ -60,6 +36,116 @@ function StatCard({ label, value, sub, color, dark }) {
   )
 }
 
+// Animated greeting component
+function AnimatedGreeting({ name, dark }) {
+  const [visible, setVisible] = useState(false)
+  const [dateVisible, setDateVisible] = useState(false)
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setVisible(true), 80)
+    const t2 = setTimeout(() => setDateVisible(true), 320)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
+  const textMain = dark ? '#FFFFFF' : '#0F2347'
+  const textSub = dark ? '#5A7A9A' : '#9CA3AF'
+  const gold = '#C9A84C'
+
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  // Capitalise first letter
+  const dateCap = dateStr.charAt(0).toUpperCase() + dateStr.slice(1)
+
+  return (
+    <div>
+      <style>{`
+        @keyframes greetFadeUp {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes dateFadeIn {
+          from { opacity: 0; transform: translateX(-8px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes underlineGrow {
+          from { width: 0; }
+          to   { width: 100%; }
+        }
+        @keyframes pulseDot {
+          0%,100% { opacity: 0.4; transform: scale(1); }
+          50%      { opacity: 1;   transform: scale(1.4); }
+        }
+      `}</style>
+
+      <p style={{
+        fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.14em',
+        color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem',
+        opacity: visible ? 1 : 0,
+        animation: visible ? 'greetFadeUp 0.55s cubic-bezier(0.22,0.61,0.36,1) both' : 'none',
+      }}>
+        Tableau de bord
+      </p>
+
+      <h1 style={{
+        fontSize: '1.9rem', fontWeight: 400, letterSpacing: '-0.02em',
+        opacity: visible ? 1 : 0,
+        animation: visible ? 'greetFadeUp 0.6s cubic-bezier(0.22,0.61,0.36,1) 0.06s both' : 'none',
+        margin: 0, lineHeight: 1.2,
+      }}>
+        <span style={{ color: textSub, fontWeight: 300 }}>Bonjour,</span>{' '}
+        <span style={{ position: 'relative', display: 'inline-block' }}>
+          <strong style={{
+            color: textMain,
+            background: `linear-gradient(135deg, ${gold} 0%, #E8C97A 50%, ${gold} 100%)`,
+            backgroundSize: '200% 200%',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            animation: 'gradShift 4s ease infinite',
+          }}>
+            {name}
+          </strong>
+          {/* animated underline */}
+          <span style={{
+            position: 'absolute', bottom: -3, left: 0,
+            height: 2, borderRadius: 2,
+            background: `linear-gradient(90deg, ${gold}, transparent)`,
+            animation: visible ? 'underlineGrow 0.8s cubic-bezier(0.22,0.61,0.36,1) 0.4s both' : 'none',
+            width: '100%',
+          }} />
+        </span>
+      </h1>
+
+      {/* Date row with live dot */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem',
+        opacity: dateVisible ? 1 : 0,
+        animation: dateVisible ? 'dateFadeIn 0.5s ease both' : 'none',
+      }}>
+        <span style={{
+          width: 7, height: 7, borderRadius: '50%', backgroundColor: gold,
+          display: 'inline-block', flexShrink: 0,
+          animation: 'pulseDot 2.2s ease-in-out infinite',
+        }} />
+        <p style={{
+          color: textSub, fontSize: '0.82rem',
+          fontFamily: 'Helvetica Neue, Arial, sans-serif', margin: 0,
+        }}>
+          {dateCap}
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes gradShift {
+          0%   { background-position: 0% 50%; }
+          50%  { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export default function ClientDashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -75,7 +161,6 @@ export default function ClientDashboard() {
 
   useEffect(() => { fetchClaims() }, [])
 
-  // Poll while any claim is still being processed
   useEffect(() => {
     const hasActive = claims.some(c => c.status === 'ANALYZING' || c.status === 'PENDING')
     if (!hasActive) return
@@ -100,6 +185,8 @@ export default function ClientDashboard() {
   const textSub = dark ? '#5A7A9A' : '#9CA3AF'
   const textBody = dark ? '#C8D8E8' : '#4B5563'
   const rowHover = dark ? '#172338' : '#F9FAFB'
+  const gold = '#C9A84C'
+  const navy = '#0F2347'
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: pageBg, fontFamily: 'Georgia, serif', transition: 'background 0.3s' }}>
@@ -109,23 +196,34 @@ export default function ClientDashboard() {
 
         {/* ── Header ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-          <div>
-            <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.14em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.3rem' }}>Tableau de bord</p>
-            <h1 style={{ fontSize: '1.9rem', color: textMain, fontWeight: 400, letterSpacing: '-0.02em' }}>
-              Bonjour, <strong>{user?.firstName || 'Client'}</strong> 👋
-            </h1>
-            <p style={{ color: textSub, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', marginTop: '0.25rem' }}>
-              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
+          <AnimatedGreeting name={user?.firstName || 'Client'} dark={dark} />
+
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <NotificationBell dark={dark} />
-            <button onClick={toggleDark}
-              style={{ padding: '0.55rem 1rem', border: `1.5px solid ${cardBorder}`, borderRadius: 8, fontSize: '0.82rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', background: cardBg, color: textSub }}>
-              {dark ? '☀ Mode clair' : '🌙 Mode sombre'}
+
+            {/* Landing-page style dark mode toggle */}
+            <button
+              onClick={toggleDark}
+              style={{
+                background: 'none',
+                border: `1px solid ${dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'}`,
+                borderRadius: 7,
+                padding: '0.4rem 0.85rem',
+                cursor: 'pointer',
+                color: dark ? 'rgba(201,168,76,0.9)' : textSub,
+                fontSize: '0.78rem',
+                fontFamily: 'Helvetica Neue, Arial, sans-serif',
+                transition: 'border-color 0.2s, color 0.2s',
+                backgroundColor: dark ? 'rgba(201,168,76,0.06)' : 'transparent',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = gold; e.currentTarget.style.color = gold }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? 'rgba(201,168,76,0.35)' : 'rgba(15,35,71,0.15)'; e.currentTarget.style.color = dark ? 'rgba(201,168,76,0.9)' : textSub }}
+            >
+              {dark ? 'Mode clair' : 'Mode sombre'}
             </button>
+
             <button onClick={() => navigate('/client/new-claim')}
-              style={{ padding: '0.7rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 15px rgba(15,35,71,0.3)', transition: 'transform 0.15s' }}
+              style={{ padding: '0.7rem 1.5rem', background: `linear-gradient(135deg, ${navy}, #1A3A6B)`, color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 15px rgba(15,35,71,0.3)', transition: 'transform 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
               onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
               + Nouveau sinistre
@@ -147,7 +245,6 @@ export default function ClientDashboard() {
         {/* ── Claims table ── */}
         <div style={{ backgroundColor: cardBg, borderRadius: 14, border: `1px solid ${cardBorder}`, overflow: 'hidden' }}>
 
-          {/* Table header bar */}
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${cardBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ color: textMain, fontSize: '1rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', marginBottom: '0.1rem' }}>Mes sinistres récents</h2>
@@ -160,14 +257,12 @@ export default function ClientDashboard() {
             )}
           </div>
 
-          {/* Column headers */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr 1fr 1fr 1.2fr 1fr', padding: '0.75rem 1.5rem', backgroundColor: dark ? '#0D1626' : '#F9FAFB', borderBottom: `1px solid ${cardBorder}` }}>
             {['Référence', 'Équipement', 'Date', 'Montant', 'Statut', 'Score IA'].map(h => (
               <div key={h} style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{h}</div>
             ))}
           </div>
 
-          {/* States */}
           {loading && (
             <div style={{ padding: '3rem', textAlign: 'center', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Chargement...</div>
           )}
@@ -178,16 +273,15 @@ export default function ClientDashboard() {
               <div style={{ color: textMain, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Aucun sinistre</div>
               <div style={{ color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontSize: '0.85rem', marginBottom: '1.5rem' }}>Soumettez votre premier sinistre pour commencer</div>
               <button onClick={() => navigate('/client/new-claim')}
-                style={{ padding: '0.65rem 1.5rem', background: 'linear-gradient(135deg, #0F2347, #1A3A6B)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '0.65rem 1.5rem', background: `linear-gradient(135deg, ${navy}, #1A3A6B)`, color: 'white', border: 'none', borderRadius: 8, fontSize: '0.85rem', fontFamily: 'Helvetica Neue, Arial, sans-serif', cursor: 'pointer', fontWeight: 600 }}>
                 + Nouveau sinistre
               </button>
             </div>
           )}
 
-          {/* Rows */}
           {claims.map((claim, i) => {
             const sc = STATUS_CONFIG[claim.status] || STATUS_CONFIG['PENDING']
-            const score = claim.analysis?.finalScore          // nested — never claim.finalScore
+            const score = claim.analysis?.finalScore
             const sBg = dark ? sc.darkBg : sc.bg
 
             return (
@@ -198,32 +292,21 @@ export default function ClientDashboard() {
                 onMouseEnter={e => e.currentTarget.style.backgroundColor = rowHover}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                {/* Reference */}
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#C9A84C', fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{claim.reference}</div>
-
-                {/* Equipment — always an object from backend */}
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: gold, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>{claim.reference}</div>
                 <div style={{ fontSize: '0.85rem', color: textBody, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                   {claim.equipment?.name || '—'}
                 </div>
-
-                {/* Date */}
                 <div style={{ fontSize: '0.8rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>
                   {new Date(claim.incidentDate).toLocaleDateString('fr-FR')}
                 </div>
-
-                {/* claimedAmount — backend field name, never "amount" */}
                 <div style={{ fontSize: '0.85rem', color: textBody, fontFamily: 'Helvetica Neue, Arial, sans-serif', fontWeight: 600 }}>
                   {claim.claimedAmount != null ? claim.claimedAmount.toLocaleString('fr-FR') + ' DA' : '—'}
                 </div>
-
-                {/* Status badge */}
                 <div>
                   <span style={{ padding: '0.25rem 0.75rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600, fontFamily: 'Helvetica Neue, Arial, sans-serif', backgroundColor: sBg, color: sc.color, border: `1px solid ${sc.border}` }}>
                     {sc.label}
                   </span>
                 </div>
-
-                {/* AI score bar — from claim.analysis.finalScore */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {score != null ? (
                     <>
@@ -243,7 +326,6 @@ export default function ClientDashboard() {
           })}
         </div>
 
-        {/* Score legend */}
         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: cardBg, borderRadius: 10, border: `1px solid ${cardBorder}` }}>
           <span style={{ fontSize: '0.72rem', color: textSub, fontFamily: 'Helvetica Neue, Arial, sans-serif' }}>Score IA :</span>
           {[['0-29', '#1A7A4A', 'Auto approuvé'], ['30-69', '#F39C12', 'Révision humaine'], ['70-100', '#C0392B', 'Auto rejeté']].map(([r, c, l]) => (
