@@ -195,6 +195,4 @@ GitHub Actions pipeline at `.github/workflows/ci.yml`:
 
 ---
 
-## Academic Context
 
-This project was developed as a final-year engineering graduation project (*Projet de Fin d'Études*) at Université M'Hamed Bougara de Boumerdès, supervised by Dr. Yahiatene. It targets the Algerian industrial insurance sector and is designed to demonstrate production-grade backend engineering with integrated multimodal AI.
